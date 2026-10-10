@@ -2,6 +2,7 @@ package com.chronoflow.local.data
 
 import android.content.Context
 import com.chronoflow.local.ai.DeepSeekClient
+import com.chronoflow.local.canvas.CanvasClient
 import com.chronoflow.local.domain.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,15 +15,21 @@ import java.time.ZoneId
 class LocalRepository(context: Context) {
     private val store = EncryptedStore(context)
     private val deepSeek = DeepSeekClient()
+    private val canvas = CanvasClient()
     private val mutex = Mutex()
+    private val canvasMutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutable = MutableStateFlow(LocalState())
     val state = mutable.asStateFlow()
     val storageError = MutableStateFlow<String?>(null)
     val aiError = MutableStateFlow<String?>(null)
     val lastNotification = MutableStateFlow("尚未收到微信或 QQ 通知")
+    val canvasStatus = MutableStateFlow("尚未连接 Canvas")
     private val ready = scope.async {
-        try { mutable.value = store.load() }
+        try {
+            mutable.value = store.load()
+            if (mutable.value.preferences.canvasEnabled) canvasStatus.value = "Canvas 已连接，等待同步"
+        }
         catch (e: Exception) { storageError.value = "本地数据读取失败，已停止写入以保护文件。请勿清除应用数据。"; throw e }
     }
     suspend fun awaitReady() { ready.await() }
@@ -99,13 +106,44 @@ class LocalRepository(context: Context) {
     suspend fun saveEvent(event: FixedEvent) = change { LocalEngine.saveEvent(it, event, Instant.now()) }
     suspend fun cancelEvent(id: String) = change(replan = true) { it.copy(events = it.events.filterNot { e -> e.id == id }) }
     suspend fun lock(id: String) = change(replan = true) { it.copy(schedule = it.schedule.copy(blocks = it.schedule.blocks.map { b -> if (b.id != id) b else b.copy(locked = !b.locked) })) }
+    suspend fun configureCanvas(baseUrl: String, accessToken: String) {
+        awaitReady()
+        val normalized = CanvasClient.normalizeBaseUrl(baseUrl)
+        CanvasClient.validateToken(accessToken)
+        preferences(mutable.value.preferences.copy(canvasEnabled = true, canvasBaseUrl = normalized, canvasAccessToken = accessToken))
+        syncCanvas()
+    }
+    suspend fun disconnectCanvas() {
+        awaitReady()
+        preferences(mutable.value.preferences.copy(canvasEnabled = false, canvasBaseUrl = "", canvasAccessToken = ""))
+        canvasStatus.value = "尚未连接 Canvas"
+    }
+    suspend fun syncCanvas() = canvasMutex.withLock {
+        awaitReady()
+        val p = mutable.value.preferences
+        require(p.canvasEnabled) { "请先连接 Canvas" }
+        canvasStatus.value = "正在从 Canvas 同步课程、作业、公告和日历…"
+        try {
+            val payload = canvas.sync(p.canvasBaseUrl, p.canvasAccessToken)
+            var stats = CanvasMergeStats()
+            change { state -> CanvasSyncEngine.merge(state, payload.items, Instant.now()).also { stats = it.stats }.state }
+            canvasStatus.value = "同步完成：${payload.courseCount} 门课程，新增 ${stats.added} 条，更新 ${stats.updated} 条，未变化 ${stats.unchanged} 条"
+        } catch (e: Exception) {
+            canvasStatus.value = "同步失败：${e.message.orEmpty().take(180)}"
+            throw e
+        }
+    }
     suspend fun preferences(p: Preferences) = change(replan = true) {
         require(p.startHour in 0..23 && p.endHour in 1..24 && p.endHour > p.startHour) { "请设置有效的每日可用时间" }
         ZoneId.of(p.zone)
-        require(p.groups.all { g -> g.source != Source.MANUAL && g.name.isNotBlank() && g.name.length <= 100 }) { "群名无效" }
+        require(p.groups.all { g -> g.source in listOf(Source.WECHAT, Source.QQ) && g.name.isNotBlank() && g.name.length <= 100 }) { "群名无效" }
         require(!p.enabled || p.groups.isNotEmpty()) { "请先添加群名白名单" }
         require(!p.aiEnabled || p.deepSeekApiKey.length in 8..512) { "请填写有效的 DeepSeek API Key" }
         require(p.deepSeekModel.isNotBlank() && p.deepSeekModel.length <= 100 && p.deepSeekModel.none { c -> c.isWhitespace() }) { "DeepSeek 模型名称无效" }
+        if (p.canvasEnabled) {
+            CanvasClient.normalizeBaseUrl(p.canvasBaseUrl)
+            CanvasClient.validateToken(p.canvasAccessToken)
+        }
         it.copy(preferences = p.copy(groups = p.groups.distinct()))
     }
 }

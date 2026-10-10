@@ -14,5 +14,11 @@ class ChronoApplication : Application() {
         scope.launch {
             repository.state.collect { state -> runCatching { Reminders.arm(this@ChronoApplication, state) } }
         }
+        scope.launch {
+            runCatching {
+                repository.awaitReady()
+                if (repository.state.value.preferences.canvasEnabled) repository.syncCanvas()
+            }
+        }
     }
 }

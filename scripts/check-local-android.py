@@ -24,10 +24,11 @@ assert "org.jetbrains.kotlin.plugin.compose" in build
 assert "minSdk = 26" in build
 for relative in ["MainActivity.kt", "ChronoApplication.kt", "notifications/GroupNotificationListener.kt", "notifications/Reminders.kt"]:
     assert (main / "kotlin/com/chronoflow/local" / relative).is_file()
+assert (main / "kotlin/com/chronoflow/local/canvas/CanvasClient.kt").is_file()
 domain = main / "kotlin/com/chronoflow/local/domain"
 for file in domain.glob("*.kt"):
     assert "import android." not in file.read_text(encoding="utf-8")
 print(f"{len(xmls)} Android XML files parse successfully")
-print("Opt-in DeepSeek network permission present; no Flutter build dependency; backup disabled")
+print("Opt-in DeepSeek/Canvas network permission present; no Flutter build dependency; backup disabled")
 print("Notification binding, component sources and pure Kotlin domain checks passed")
 print("This is not Gradle/Android compilation or real-device verification.")

@@ -1,11 +1,12 @@
 # 时序 · ChronoFlow 手机本地版
 
-当前主线是 **Kotlin + Jetpack Compose 原生 Android 应用**：提取微信、QQ 群系统通知，使用本地规则或用户主动配置的 DeepSeek API 识别内容，并在手机上确认、保存和安排日程。
+当前主线是 **Kotlin + Jetpack Compose 原生 Android 应用**：提取微信、QQ 群系统通知，或通过 Canvas 官方 API 同步课程信息，再使用本地规则或用户主动配置的 DeepSeek API 识别内容，并在手机上确认、保存和安排日程。
 
 **Android Studio 请打开 [apps/android](apps/android)，不是旧的 apps/mobile。**
 
 ```text
 微信 / QQ 系统通知（仅白名单群）
+Canvas API（课程、作业、公告、课程日历）
     → 本地规则或 DeepSeek 提取 → 核对新增 / 修改 / 取消
     → 手机任务与固定日程 → 本地排程 → 时间表与开始提醒
 ```
@@ -14,6 +15,7 @@
 
 - 原生中文五页面：今天、发现、任务、日历、设置。
 - 微信、QQ 系统通知监听；应用 + 群名白名单；普通正文、长文本、多消息处理与去重。
+- Canvas 连接器：用户在学校站点登录并创建个人 Access Token；同步活动课程的作业、公告和课程日历，支持重复过滤与内容/时间变更追踪。
 - 常见中文日期、截止、耗时、会议/考试时间段、延期与取消的规则提取。
 - 默认确认后应用；可选自动应用明确且完整的新建事项。歧义、修改与取消仍需确认。
 - 任务和固定日程；30分钟粒度、14天窗口的本地排程；锁定、连续时段与缺口提示。
@@ -36,6 +38,7 @@ apps/android/            当前主线：原生Android本地版
   app/src/main/kotlin/com/chronoflow/local/
     domain/              解析、过滤、状态变更、排程、提醒选择
     ai/                  DeepSeek结构化分析与学习报告
+    canvas/              Canvas官方REST API客户端与安全分页
     data/                加密持久化与本地Repository
     notifications/       通知监听、系统提醒
     ui/                  Compose五页面及编辑/确认表单

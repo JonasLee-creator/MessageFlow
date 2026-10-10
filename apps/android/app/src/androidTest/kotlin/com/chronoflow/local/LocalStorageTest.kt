@@ -19,7 +19,8 @@ class LocalStorageTest {
         val context = object : ContextWrapper(base) { override fun getFilesDir(): File = directory }
         try {
             val now = Instant.parse("2026-10-04T00:00:00Z")
-            val initial = LocalState(preferences = Preferences(enabled = true, groups = listOf(GroupRule(Source.QQ, "课程群")), zone = "Asia/Shanghai"))
+            val initial = LocalState(preferences = Preferences(enabled = true, groups = listOf(GroupRule(Source.QQ, "课程群")), zone = "Asia/Shanghai",
+                canvasEnabled = true, canvasBaseUrl = "https://canvas.example.edu", canvasAccessToken = "test-token-secret"))
             val input = Incoming(Source.QQ, "课程群", "实验三明天18:00提交，预计2小时", now)
             val pending = LocalEngine.ingest(initial, input, now)
             val n = pending.notices.single()
@@ -29,6 +30,7 @@ class LocalStorageTest {
             assertEquals(state, EncryptedStore(context).load())
             val bytes = File(directory, "local-state.enc").readBytes()
             assertFalse(String(bytes, Charsets.UTF_8).contains("实验三"))
+            assertFalse(String(bytes, Charsets.UTF_8).contains("test-token-secret"))
             val changed = state.copy(preferences = state.preferences.copy(enabled = false))
             EncryptedStore(context).save(changed)
             assertEquals(changed, EncryptedStore(context).load())

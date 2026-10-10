@@ -1,6 +1,6 @@
 # 原生 Android 手机端（本地核心 + 可选 DeepSeek）
 
-更新：2026-10-10。当前范围：手机端提取微信/QQ群系统通知，使用本地规则或用户主动配置的 DeepSeek API 理解信息并安排日程。主工程是 `apps/android`，旧Flutter与FastAPI工程保留但不参与运行。
+更新：2026-10-10。当前范围：手机端提取微信/QQ群系统通知，并通过 Canvas 官方 API 同步课程信息，再使用本地规则或用户主动配置的 DeepSeek API 理解信息并安排日程。主工程是 `apps/android`，旧Flutter与FastAPI工程保留但不参与运行。
 
 ## 所有业务在手机运行
 
@@ -18,6 +18,19 @@
 - 本地风险层会识别24小时内未排完、历史估时偏低和截止时间反复变化。
 
 AI 结果不会自动修改已有事项；修改、取消和模糊结果始终进入「发现」确认。DeepSeek 不可用时，通知自动回退到本地规则识别。
+
+## Canvas 连接器
+
+Canvas 使用官方 REST API，不抓取登录后的网页，也不让 App 接触学校账号密码。当前版本采用个人 Access Token，适合学校尚未为比赛项目配置 Developer Key 的阶段：
+
+1. 在「设置 → Canvas 课程平台」填写学校 Canvas 根地址，例如 `https://canvas.example.edu`。
+2. 点「打开 Canvas 设置」，在系统浏览器中完成学校登录。
+3. 在 Canvas 的 Account → Settings → Approved Integrations 中创建 Access Token，然后粘贴回 App。
+4. 点「连接并同步」。之后可手动同步，App 每次启动时也会同步一次。
+
+连接器读取当前账号可访问的活动课程、作业、最近公告和课程日历。首次出现的事项和后续时间/内容变化都会进入「发现」；相同记录不会重复创建。作业默认估时60分钟，缺少截止日期或日历结束时间时会明确要求核对。公告继续由本地规则判断是否包含行动事项。
+
+Canvas Token 使用 Android Keystore 加密保存在应用私有数据中。API 请求仅允许 `https://` 地址；Canvas 返回的分页链接必须与用户填写的站点同源，避免凭据被发送到其他主机。「断开并清除 Token」会删除本机保存的连接信息。学校若禁用个人 Token，需要管理员创建 Canvas Developer Key，才能进一步使用标准 OAuth 登录；OAuth 客户端密钥不应写入 APK。
 
 ## Android Studio 打开与后续构建
 
@@ -53,6 +66,7 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 6. 每日可用时间在设置中调整。固定课程通过日历的「固定日程」添加，排程会避让。
 7. 如需开始提醒，允许系统显示通知。使用普通非精确定时，省电或后台限制可能造成延迟。
 8. 如需 AI，在「设置」填写 DeepSeek API Key、模型名并明确开启。可在「今天」生成三类报告，在「发现」查看 AI 的依据和置信度。
+9. 如需 Canvas，在「设置」按 Canvas 面板的三步说明连接；同步结果到「发现」确认。
 
 首次启动无示例假数据、无需登录。尚未授权时，可用「发现→录入通知」先测试流程。
 
@@ -110,7 +124,7 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 已实际执行：
 
 - 使用已有IntelliJ Kotlin编译器编译生产domain代码及测试入口。
-- **47项核心检查通过**，包括通知兼容过滤，以及一项含100组随机排程的冲突与截止约束检查。
+- **51项核心检查通过**，包括 Canvas 导入/去重/变更追踪、通知兼容过滤，以及一项含100组随机排程的冲突与截止约束检查。
 - 整个原生工程Kotlin/Gradle Kotlin DSL的PSI语法解析通过。
 - Gradle Android 完整编译、Debug APK打包与 JVM 单元测试通过。
 - Android XML、可选 DeepSeek 网络权限、无Flutter构建依赖等静态检查通过。
@@ -125,7 +139,7 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 
 已编写但尚未执行：Android `LocalStorageTest`（schema/加密存储/重启读取）、`NavigationTest`（五页面导航）。原生CI已完成云端编译、测试和APK上传。
 
-尚未验证：真实 DeepSeek API Key 请求、实际微信/QQ通知的完整机型覆盖、设备Keystore重启测试、后台提醒及屏幕/大字体视觉效果。
+尚未验证：用户学校的真实 Canvas 地址与 Token、真实 DeepSeek API Key 请求、实际微信/QQ通知的完整机型覆盖、设备Keystore重启测试、后台提醒及屏幕/大字体视觉效果。
 
 ## 真机验收
 
@@ -142,3 +156,5 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 - [通知监听服务](https://developer.android.com/reference/android/service/notification/NotificationListenerService)
 - [通知字段与MessagingStyle](https://developer.android.com/reference/android/app/Notification)
 - [Compose编译插件](https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler)
+- [Canvas OAuth2](https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth)
+- [Canvas REST API](https://developerdocs.instructure.com/services/canvas)

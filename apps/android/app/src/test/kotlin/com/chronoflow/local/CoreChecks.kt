@@ -134,6 +134,36 @@ object CoreChecks {
             val state = LocalEngine.ingest(empty, incoming("实验三明天18:00提交，预计2小时"), clock)
             check(state.tasks.isEmpty() && state.notices.single().status == NoticeStatus.REVIEW)
         }
+        test("Canvas assignment enters review with structured deadline") {
+            val item = CanvasItem("assignment:1:9", CanvasItemType.ASSIGNMENT, "机器学习", "实验四", dueAt = clock.plusSeconds(86400))
+            val result = CanvasSyncEngine.merge(empty, listOf(item), clock)
+            val notice = result.state.notices.single()
+            check(result.stats.added == 1 && notice.input.source == Source.CANVAS)
+            check(notice.proposal.action == Action.CREATE_TASK && notice.proposal.deadline == item.dueAt && !notice.proposal.autoSafe)
+        }
+        test("unchanged Canvas records do not create duplicates") {
+            val item = CanvasItem("assignment:1:9", CanvasItemType.ASSIGNMENT, "机器学习", "实验四", dueAt = clock.plusSeconds(86400))
+            val first = CanvasSyncEngine.merge(empty, listOf(item), clock).state
+            val second = CanvasSyncEngine.merge(first, listOf(item.copy(updatedAt = clock.plusSeconds(60))), clock.plusSeconds(60))
+            check(second.state.notices.size == 1 && second.stats.unchanged == 1)
+        }
+        test("Canvas deadline change updates the confirmed task through review") {
+            val item = CanvasItem("assignment:1:9", CanvasItemType.ASSIGNMENT, "机器学习", "实验四", dueAt = clock.plusSeconds(86400))
+            val imported = CanvasSyncEngine.merge(empty, listOf(item), clock).state
+            val notice = imported.notices.single()
+            val applied = LocalEngine.apply(imported, notice.id, notice.proposal, clock)
+            val changed = CanvasSyncEngine.merge(applied, listOf(item.copy(dueAt = clock.plusSeconds(172800))), clock.plusSeconds(60))
+            val update = changed.state.notices.first()
+            check(changed.stats.updated == 1 && update.proposal.action == Action.UPDATE_TASK)
+            check(update.proposal.targetId == applied.tasks.single().id && update.proposal.deadline == clock.plusSeconds(172800))
+        }
+        test("pending Canvas update replaces its earlier review card") {
+            val item = CanvasItem("event:course_1:7", CanvasItemType.EVENT, "高数", "习题课", startAt = clock.plusSeconds(3600))
+            val first = CanvasSyncEngine.merge(empty, listOf(item), clock).state
+            val second = CanvasSyncEngine.merge(first, listOf(item.copy(startAt = clock.plusSeconds(7200))), clock.plusSeconds(60)).state
+            check(second.notices.size == 1 && second.notices.single().id == first.notices.single().id)
+            check(second.notices.single().proposal.end == clock.plusSeconds(10800))
+        }
         test("AI multi-item analysis creates separate review cards") {
             val proposals = listOf(
                 Proposal(Action.CREATE_TASK, "实验四", minutes = 90, aiGenerated = true, confidence = .92, evidence = listOf("实验四")),

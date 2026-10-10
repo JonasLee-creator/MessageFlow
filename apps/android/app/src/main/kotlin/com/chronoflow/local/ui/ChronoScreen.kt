@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
     val diskError by vm.repository.storageError.collectAsStateWithLifecycle()
     val aiError by vm.repository.aiError.collectAsStateWithLifecycle()
     val lastNotification by vm.repository.lastNotification.collectAsStateWithLifecycle()
+    val canvasStatus by vm.repository.canvasStatus.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
     var editTask by remember { mutableStateOf<Task?>(null) }
@@ -76,7 +77,11 @@ import kotlinx.coroutines.delay
                     onToggleSubTask = { task, sub -> vm.run { vm.repository.toggleSubTask(task.id, sub.id) } })
                 3 -> CalendarPage(state, today.plusDays(dayOffset.toLong()), dayOffset, { dayOffset = it }, busy,
                     onLock = { vm.run { vm.repository.lock(it.id) } }, onEditEvent = { editEvent = it; editor = "event" }, onCancelEvent = { vm.run { vm.repository.cancelEvent(it.id) } })
-                4 -> SettingsPage(state.preferences, busy, lastNotification, onSave = { p -> vm.run { vm.repository.preferences(p) } })
+                4 -> SettingsPage(state.preferences, busy, lastNotification, canvasStatus,
+                    onSave = { p -> vm.run { vm.repository.preferences(p) } },
+                    onConnectCanvas = { url, token -> vm.run { vm.repository.configureCanvas(url, token) } },
+                    onSyncCanvas = { vm.run { vm.repository.syncCanvas() } },
+                    onDisconnectCanvas = { vm.run { vm.repository.disconnectCanvas() } })
             }
         }
     }
@@ -197,15 +202,23 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
     val notices = state.notices.filter { !onlyReview || it.status == NoticeStatus.REVIEW }
     LazyColumn(contentPadding = pagePadding, verticalArrangement = gaps) {
         item { PageHeading("MESSAGE → PLAN", "发现，值得行动的信息。",
-            if (state.preferences.aiEnabled) "DeepSeek 辅助理解；结果必须由你核对。" else "本地规则提取，不联网、不上传群聊内容。") }
+            when {
+                state.preferences.aiEnabled -> "DeepSeek 辅助理解；结果必须由你核对。"
+                state.preferences.canvasEnabled -> "群聊由本地规则提取；Canvas 从学校官方 API 同步。"
+                else -> "本地规则提取，不联网、不上传群聊内容。"
+            }) }
         item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(onlyReview, { onlyReview = true }, label = { Text("待确认") })
             FilterChip(!onlyReview, { onlyReview = false }, label = { Text("全部通知") })
         } }
-        if (notices.isEmpty()) item { EmptyPanel(if (onlyReview) "没有待确认的信息" else "还没有收到通知", "可点击下方「录入通知」测试识别，或开启群通知采集。") }
+        if (notices.isEmpty()) item { EmptyPanel(if (onlyReview) "没有待确认的信息" else "还没有收到通知", "可点击下方「录入通知」测试识别，或在设置中开启群通知与 Canvas 同步。") }
         items(notices, key = { it.id }) { n -> Panel {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (n.input.source == Source.MANUAL) Icons.Outlined.ContentPaste else Icons.Outlined.ChatBubbleOutline, null, tint = Teal)
+                Icon(when (n.input.source) {
+                    Source.MANUAL -> Icons.Outlined.ContentPaste
+                    Source.CANVAS -> Icons.Outlined.CloudDownload
+                    else -> Icons.Outlined.ChatBubbleOutline
+                }, null, tint = Teal)
                 Spacer(Modifier.width(8.dp)); Text("${n.input.source.label} · ${n.input.group.ifBlank { "手动录入" }}", Modifier.weight(1f), fontWeight = FontWeight.Bold)
                 Text(when (n.status) { NoticeStatus.REVIEW -> "待确认"; NoticeStatus.APPLIED -> "已应用"; NoticeStatus.IGNORED -> "已忽略" }, style = MaterialTheme.typography.labelSmall, color = Teal)
             }

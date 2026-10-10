@@ -19,6 +19,7 @@ object StateCodec {
         return obj("schema" to 1, "preferences" to obj("enabled" to p.enabled, "autoCreate" to p.autoCreate,
             "startHour" to p.startHour, "endHour" to p.endHour, "zone" to p.zone, "reminders" to p.reminders,
             "aiEnabled" to p.aiEnabled, "deepSeekApiKey" to p.deepSeekApiKey, "deepSeekModel" to p.deepSeekModel,
+            "canvasEnabled" to p.canvasEnabled, "canvasBaseUrl" to p.canvasBaseUrl, "canvasAccessToken" to p.canvasAccessToken,
             "groups" to arr(p.groups.map { obj("source" to it.source.name, "name" to it.name) })),
             "notices" to arr(state.notices.map { n -> obj("id" to n.id, "status" to n.status.name, "appliedId" to n.appliedId,
                 "input" to obj("source" to n.input.source.name, "group" to n.input.group, "content" to n.input.content, "receivedAt" to n.input.receivedAt.toString(), "sender" to n.input.sender, "sourceKey" to n.input.sourceKey),
@@ -50,7 +51,8 @@ object StateCodec {
         val p = root.getJSONObject("preferences")
         val preferences = Preferences(p.getBoolean("enabled"), p.rows("groups").map { GroupRule(Source.valueOf(it.getString("source")), it.getString("name")) },
             p.optBoolean("autoCreate"), p.getInt("startHour"), p.getInt("endHour"), p.getString("zone"), p.optBoolean("reminders", true),
-            p.optBoolean("aiEnabled"), p.optString("deepSeekApiKey"), p.optString("deepSeekModel", "deepseek-flash"))
+            p.optBoolean("aiEnabled"), p.optString("deepSeekApiKey"), p.optString("deepSeekModel", "deepseek-flash"),
+            p.optBoolean("canvasEnabled"), p.optString("canvasBaseUrl"), p.optString("canvasAccessToken"))
         val notices = root.rows("notices").map { n ->
             val i = n.getJSONObject("input"); val q = n.getJSONObject("proposal")
             Notice(n.getString("id"), Incoming(Source.valueOf(i.getString("source")), i.getString("group"), i.getString("content"), Instant.parse(i.getString("receivedAt")), i.optString("sender"), i.optString("sourceKey")),

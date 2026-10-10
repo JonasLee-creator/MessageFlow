@@ -6,7 +6,8 @@ import java.util.UUID
 
 fun newId(): String = UUID.randomUUID().toString()
 enum class Source(val label: String, val packageName: String) {
-    WECHAT("微信", "com.tencent.mm"), QQ("QQ", "com.tencent.mobileqq"), MANUAL("手动", "")
+    WECHAT("微信", "com.tencent.mm"), QQ("QQ", "com.tencent.mobileqq"),
+    CANVAS("Canvas", "canvas-api"), MANUAL("手动", "")
 }
 enum class Action(val label: String) {
     CREATE_TASK("创建任务"), UPDATE_TASK("修改任务"), CANCEL_TASK("取消任务"),
@@ -27,6 +28,9 @@ data class Preferences(
     val aiEnabled: Boolean = false,
     val deepSeekApiKey: String = "",
     val deepSeekModel: String = "deepseek-flash",
+    val canvasEnabled: Boolean = false,
+    val canvasBaseUrl: String = "",
+    val canvasAccessToken: String = "",
 )
 data class Incoming(
     val source: Source, val group: String, val content: String, val receivedAt: Instant,

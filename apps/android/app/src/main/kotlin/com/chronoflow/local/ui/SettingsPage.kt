@@ -3,6 +3,7 @@ package com.chronoflow.local.ui
 import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,7 +36,11 @@ private fun access(context: android.content.Context): Boolean {
     p: Preferences,
     busy: Boolean,
     lastNotification: String,
+    canvasStatus: String,
     onSave: (Preferences) -> Unit,
+    onConnectCanvas: (String, String) -> Unit,
+    onSyncCanvas: () -> Unit,
+    onDisconnectCanvas: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
@@ -48,6 +53,8 @@ private fun access(context: android.content.Context): Boolean {
     var aiEnabled by rememberSaveable(p.aiEnabled) { mutableStateOf(p.aiEnabled) }
     var apiKey by rememberSaveable(p.deepSeekApiKey) { mutableStateOf(p.deepSeekApiKey) }
     var aiModel by rememberSaveable(p.deepSeekModel) { mutableStateOf(p.deepSeekModel) }
+    var canvasUrl by rememberSaveable(p.canvasBaseUrl) { mutableStateOf(p.canvasBaseUrl) }
+    var canvasToken by remember(p.canvasAccessToken) { mutableStateOf(p.canvasAccessToken) }
     var message by remember { mutableStateOf<String?>(null) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { remindersGranted = Reminders.allowed(context) }
     DisposableEffect(lifecycle) {
@@ -98,6 +105,37 @@ private fun access(context: android.content.Context): Boolean {
             Text("API Key 随其他数据使用 Android Keystore 加密保存在本机；请求会产生 DeepSeek API 费用。AI 结果始终先进入「发现」供你核对。", style = MaterialTheme.typography.bodySmall, color = Muted)
         } }
         item { Panel {
+            Text("Canvas 课程平台", style = MaterialTheme.typography.titleMedium)
+            Text("同步已选账号可访问的课程、作业、公告和课程日历。所有新增或变更先进入「发现」，由你确认后才写入日程。", style = MaterialTheme.typography.bodySmall)
+            Text("1. 在浏览器登录学校 Canvas。\n2. 进入 Account → Settings → Approved Integrations，创建 Access Token。\n3. 回到此处粘贴学校站点地址和 Token。", style = MaterialTheme.typography.bodySmall, color = Muted)
+            OutlinedTextField(canvasUrl, { canvasUrl = it.trim() }, label = { Text("学校 Canvas 地址") },
+                placeholder = { Text("https://canvas.example.edu") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
+            OutlinedTextField(canvasToken, { canvasToken = it.trim() }, label = { Text("Canvas Access Token") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    val target = canvasUrl.trim().trimEnd('/').let { if (it.startsWith("https://")) "$it/profile/settings" else it }
+                    if (!target.startsWith("https://")) message = "请先填写 https:// 开头的 Canvas 地址"
+                    else runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
+                        .onFailure { message = "无法打开浏览器，请检查 Canvas 地址" }
+                }) { Text("打开 Canvas 设置") }
+                Button(onClick = {
+                    if (!canvasUrl.startsWith("https://") || canvasToken.length !in 8..4096) message = "请填写有效的 Canvas 地址和 Access Token"
+                    else { onConnectCanvas(canvasUrl, canvasToken); message = null }
+                }, enabled = !busy) { Text(if (p.canvasEnabled) "保存并重新连接" else "连接并同步") }
+            }
+            if (p.canvasEnabled) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onSyncCanvas, enabled = !busy) { Text("立即同步") }
+                TextButton(onClick = {
+                    canvasUrl = ""; canvasToken = ""; onDisconnectCanvas(); message = null
+                }, enabled = !busy) { Text("断开并清除 Token") }
+            }
+            Text(canvasStatus, style = MaterialTheme.typography.bodySmall, color = if (canvasStatus.startsWith("同步失败")) MaterialTheme.colorScheme.error else Teal)
+            Text("App 不接触 Canvas 密码。Token 与本地计划一起由 Android Keystore 加密，且只发送到你填写的同一 HTTPS Canvas 主机。若学校禁用了个人 Token，需要管理员提供 Canvas Developer Key 后才能改用 OAuth。", style = MaterialTheme.typography.bodySmall, color = Muted)
+        } }
+        item { Panel {
             Text("2 · 授权通知访问", style = MaterialTheme.typography.titleMedium)
             Text(if (granted) "系统通知访问已授权" else "系统通知访问未授权", color = Teal)
             Text("系统授权可以访问通知。本应用仅处理微信、QQ 白名单群的相关消息，不读取聊天记录。", style = MaterialTheme.typography.bodySmall)
@@ -135,6 +173,6 @@ private fun access(context: android.content.Context): Boolean {
             Text("使用系统普通定时提醒，省电模式或厂商后台限制可能造成延迟，不作为精确闹钟。", style = MaterialTheme.typography.bodySmall, color = Muted)
         } }
         message?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { Text("时序 0.3.0\n仅能提取系统实际展示的通知文字。群聊免打扰、隐藏正文或通知被聚合时，可能无法获取，可在「发现」中手动录入。\n原始通知最多保留1000条，卸载或清除应用数据会删除本地计划。", style = MaterialTheme.typography.bodySmall, color = Muted, modifier = Modifier.padding(bottom = 20.dp)) }
+        item { Text("时序 0.4.0\n微信/QQ仅能提取系统实际展示的通知文字；Canvas 通过官方 API 同步。\n原始通知最多保留1000条，卸载或清除应用数据会删除本地计划与密钥。", style = MaterialTheme.typography.bodySmall, color = Muted, modifier = Modifier.padding(bottom = 20.dp)) }
     }
 }
