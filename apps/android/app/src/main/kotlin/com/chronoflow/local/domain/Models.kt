@@ -27,6 +27,7 @@ data class Preferences(
     val aiEnabled: Boolean = false,
     val deepSeekApiKey: String = "",
     val deepSeekModel: String = "deepseek-flash",
+    val accessibilityCaptureEnabled: Boolean = false,
 )
 data class Incoming(
     val source: Source, val group: String, val content: String, val receivedAt: Instant,

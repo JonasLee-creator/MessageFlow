@@ -98,6 +98,21 @@ object CoreChecks {
             check(p.end == null && !p.autoSafe)
         }
         val enabled = prefs.copy(enabled = true, groups = listOf(GroupRule(Source.WECHAT, "网络课"), GroupRule(Source.QQ, "QQ课程群")))
+        val foregroundEnabled = enabled.copy(accessibilityCaptureEnabled = true)
+        test("foreground capture requires explicit app consent and exact WeChat group") {
+            check(ForegroundCaptureGuard.allowedGroup(listOf("网络课"), enabled) == null)
+            check(ForegroundCaptureGuard.allowedGroup(listOf("网络课"), foregroundEnabled) == "网络课")
+            check(ForegroundCaptureGuard.allowedGroup(listOf("网络课 (38)"), foregroundEnabled) == "网络课")
+            check(ForegroundCaptureGuard.allowedGroup(listOf("网络课程群2"), foregroundEnabled) == null)
+            check(ForegroundCaptureGuard.allowedGroup(listOf("QQ课程群"), foregroundEnabled) == null)
+        }
+        test("foreground capture removes controls timestamps and duplicate nodes") {
+            val candidates = ForegroundCaptureGuard.messageCandidates(
+                listOf("网络课", "微信", "19:01", "实验四明天提交", "实验四明天提交", "发送"),
+                "网络课",
+            )
+            check(candidates == listOf("实验四明天提交")) { candidates.toString() }
+        }
         fun envelope(pkg: String = Source.WECHAT.packageName, title: String = "网络课") = NotificationEnvelope(pkg, "key", clock.toEpochMilli(), title = title, text = "实验三明天提交")
         test("WeChat exact whitelist") { check(NotificationMatcher.extract(envelope(), enabled).size == 1) }
         test("QQ unread and sender group title") {
@@ -110,10 +125,14 @@ object CoreChecks {
             check(NotificationMatcher.extract(envelope(title = "网络课程群2"), enabled).isEmpty())
             check(NotificationMatcher.extract(envelope(pkg = "untrusted.app"), enabled).isEmpty())
         }
-        test("summary skipped; individual MessagingStyle messages preserved") {
-            check(NotificationMatcher.extract(envelope().copy(summary = true), enabled).isEmpty())
+        test("matching summary accepted; individual MessagingStyle messages preserved") {
+            check(NotificationMatcher.extract(envelope().copy(summary = true), enabled).size == 1)
             val rows = NotificationMatcher.extract(envelope().copy(messages = listOf(MessagePart("实验三明天交", "老师", 1000), MessagePart("明天开会", "班长", 2000))), enabled)
             check(rows.size == 2 && rows[0].receivedAt == Instant.ofEpochMilli(1000))
+        }
+        test("WeChat group can be identified from subtext or body prefix") {
+            check(NotificationMatcher.extract(envelope(title = "微信").copy(subText = "网络课"), enabled).size == 1)
+            check(NotificationMatcher.extract(envelope(title = "微信").copy(text = "【网络课】：实验三明天提交"), enabled).size == 1)
         }
         test("conversation title wins when sender shown in title") {
             check(NotificationMatcher.extract(envelope(title = "张老师").copy(conversationTitle = "网络课"), enabled).size == 1)

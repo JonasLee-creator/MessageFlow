@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_label">时序 · 微信前台白名单采集</string>
+    <string name="accessibility_service_description">经你授权后，仅在微信前台打开白名单群时识别新出现的文字，并交给时序生成待确认事项。不会点击、滑动、输入或访问微信后台聊天数据库。</string>
+</resources>
