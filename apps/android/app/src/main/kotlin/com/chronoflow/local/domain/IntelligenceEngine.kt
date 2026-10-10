@@ -23,10 +23,16 @@ object IntelligenceEngine {
         return samples.sorted()[samples.size / 2].coerceIn(1, 20160)
     }
 
+    fun personalDurationSuggestion(task: Task, state: LocalState): DurationSuggestion? =
+        PersonalTimeModel.durationSuggestion(task.title, task.group, task.category, task.difficulty,
+            task.originalEstimateMinutes, state)
+
     fun risks(state: LocalState, now: Instant): List<Risk> {
         val learned = state.tasks.filter { it.status == TaskStatus.ACTIVE }.mapNotNull { task ->
-            val suggested = durationSuggestion(task.title, state) ?: return@mapNotNull null
-            if (suggested > task.minutes * 5 / 4) Risk(task.title, "按历史实际用时，可能需要约 $suggested 分钟；当前估计为 ${task.minutes} 分钟", suggested - task.minutes) else null
+            val insight = personalDurationSuggestion(task, state) ?: return@mapNotNull null
+            if (insight.minutes > task.minutes * 5 / 4) Risk(task.title,
+                "按历史实际用时，根据${insight.basis}通常需要预计值的 %.1f 倍，建议约 ${insight.minutes} 分钟；当前估计为 ${task.minutes} 分钟".format(insight.multiplier),
+                insight.minutes - task.minutes) else null
         }
         val urgent = state.tasks.filter { task ->
             task.status == TaskStatus.ACTIVE && task.deadline?.let { it > now && Duration.between(now, it).toHours() <= 24 } == true

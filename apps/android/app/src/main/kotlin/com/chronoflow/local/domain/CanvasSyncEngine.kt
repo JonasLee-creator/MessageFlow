@@ -46,7 +46,7 @@ object CanvasSyncEngine {
             val targetId = current.notices.firstOrNull {
                 it.input.sourceKey == sourceKey && it.status == NoticeStatus.APPLIED && it.appliedId != null
             }?.appliedId
-            val proposal = proposal(item, input, current, targetId, previous != null)
+            val proposal = UncertaintyEngine.assess(input, proposal(item, input, current, targetId, previous != null), current)
             val replacement = Notice(
                 id = if (previous?.status == NoticeStatus.REVIEW) previous.id else newId(),
                 input = input,

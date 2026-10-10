@@ -178,6 +178,29 @@ object CoreChecks {
             val applied = LocalEngine.apply(pending, pending.notices.single().id, p, clock)
             check(applied.tasks.single().subTasks.map { it.title } == listOf("查资料", "写初稿"))
         }
+        test("local uncertainty decomposes confidence and allows only complete creation") {
+            val input = incoming("实验四明天18:00前提交，预计2小时")
+            val state = LocalEngine.ingestAnalyzed(empty, input, listOf(Proposal(Action.CREATE_TASK, "实验四",
+                deadline = clock.plusSeconds(34 * 3600), minutes = 120, evidence = listOf("实验四", "明天18:00前提交"),
+                aiGenerated = true, confidence = .93)), clock)
+            val assessed = state.notices.single().proposal
+            check(assessed.uncertainty != null && assessed.uncertainty!!.blockingFields.isEmpty())
+            check(assessed.uncertainty!!.fields.time >= .9 && assessed.autoSafe)
+        }
+        test("uncertainty blocks conflicting actions and asks at most two useful questions") {
+            val input = incoming("实验四取消，不用提交了")
+            val proposal = Proposal(Action.CREATE_TASK, "实验四", aiGenerated = true, confidence = .95)
+            val assessed = UncertaintyEngine.assess(input, proposal, empty)
+            check("动作" in assessed.uncertainty!!.blockingFields)
+            check(assessed.questions.isNotEmpty() && assessed.questions.size <= 2 && !assessed.autoSafe)
+        }
+        test("missing update target becomes a blocking field") {
+            val input = incoming("实验四延期到明天")
+            val assessed = UncertaintyEngine.assess(input, Proposal(Action.UPDATE_TASK, "实验四",
+                deadline = clock.plusSeconds(24 * 3600), aiGenerated = true, confidence = .9, evidence = listOf("实验四")), empty)
+            check("目标事项" in assessed.uncertainty!!.blockingFields)
+            check(assessed.questions.any { "选择" in it })
+        }
         test("personal duration learning uses completed actual samples") {
             val history = listOf(
                 Task(title = "机器学习实验一", status = TaskStatus.COMPLETED, actualMinutes = 100),
@@ -185,6 +208,33 @@ object CoreChecks {
                 Task(title = "英语阅读", status = TaskStatus.COMPLETED, actualMinutes = 20),
             )
             check(IntelligenceEngine.durationSuggestion("机器学习实验三", empty.copy(tasks = history)) == 140)
+        }
+        test("personal model learns a conservative category duration multiplier") {
+            val history = (1..6).map { index -> Task(title = "编程实验$index", category = TaskCategory.PROGRAMMING,
+                minutes = 100, originalEstimateMinutes = 100, status = TaskStatus.COMPLETED, actualMinutes = 160) }
+            val suggestion = PersonalTimeModel.durationSuggestion("新的编程实验", "", TaskCategory.PROGRAMMING, 3, 100,
+                empty.copy(tasks = history))!!
+            check(suggestion.minutes in 130..160 && suggestion.multiplier > 1.25 && suggestion.sampleCount >= 6) { suggestion.toString() }
+        }
+        test("personal model learns preferred time buckets from execution outcomes") {
+            val task = Task(title = "编程实验", category = TaskCategory.PROGRAMMING, deadline = clock.plusSeconds(48 * 3600))
+            val morning = clock.plusSeconds(3600)
+            val night = clock.plusSeconds(14 * 3600)
+            val history = (1..5).flatMap { index -> listOf(
+                ExecutionRecord(taskId = "old-$index", category = TaskCategory.PROGRAMMING, group = "", plannedStart = morning.minusSeconds(index * 86400L), plannedMinutes = 60, outcome = ExecutionOutcome.COMPLETED),
+                ExecutionRecord(taskId = "old-n-$index", category = TaskCategory.PROGRAMMING, group = "", plannedStart = night.minusSeconds(index * 86400L), plannedMinutes = 60, outcome = ExecutionOutcome.SKIPPED),
+            ) }
+            val modelState = empty.copy(tasks = listOf(task), executionHistory = history)
+            check(PersonalTimeModel.slotScore(task, morning, modelState) > PersonalTimeModel.slotScore(task, night, modelState))
+            check(PersonalTimeModel.bestWindow(task, modelState)?.label?.startsWith("上午") == true)
+        }
+        test("execution feedback reduces remaining work and survives replanning input") {
+            val task = Task(title = "课程报告", minutes = 90, remaining = 90, category = TaskCategory.REPORT)
+            val block = Block(taskId = task.id, start = clock, end = clock.plusSeconds(1800))
+            val state = empty.copy(tasks = listOf(task), schedule = Schedule(blocks = listOf(block)))
+            val next = PersonalTimeModel.record(state, block.id, ExecutionOutcome.COMPLETED, 40, clock.plusSeconds(1800))
+            check(next.tasks.single().remaining == 50)
+            check(next.executionHistory.single().actualMinutes == 40 && next.schedule.blocks.isEmpty())
         }
         test("local intelligence flags learned underestimation and repeated deadline changes") {
             val history = Task(title = "课程报告初稿", status = TaskStatus.COMPLETED, actualMinutes = 180)

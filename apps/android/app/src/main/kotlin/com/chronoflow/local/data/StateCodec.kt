@@ -16,7 +16,7 @@ object StateCodec {
 
     fun encode(state: LocalState): ByteArray {
         val p = state.preferences
-        return obj("schema" to 1, "preferences" to obj("enabled" to p.enabled, "autoCreate" to p.autoCreate,
+        return obj("schema" to 2, "preferences" to obj("enabled" to p.enabled, "autoCreate" to p.autoCreate,
             "startHour" to p.startHour, "endHour" to p.endHour, "zone" to p.zone, "reminders" to p.reminders,
             "aiEnabled" to p.aiEnabled, "deepSeekApiKey" to p.deepSeekApiKey, "deepSeekModel" to p.deepSeekModel,
             "canvasEnabled" to p.canvasEnabled, "canvasBaseUrl" to p.canvasBaseUrl, "canvasAccessToken" to p.canvasAccessToken,
@@ -28,14 +28,19 @@ object StateCodec {
                 "deadline" to t.deadline?.toString(), "minutes" to t.minutes, "remaining" to t.remaining, "priority" to t.priority,
                 "splittable" to t.splittable, "status" to t.status.name, "deadlineLocked" to t.deadlineLocked, "sourceIds" to arr(t.sourceIds),
                 "subTasks" to arr(t.subTasks.map { s -> obj("id" to s.id, "title" to s.title, "done" to s.done) }),
-                "actualMinutes" to t.actualMinutes, "completedAt" to t.completedAt?.toString(), "deadlineChanges" to t.deadlineChanges) }),
+                "actualMinutes" to t.actualMinutes, "completedAt" to t.completedAt?.toString(), "deadlineChanges" to t.deadlineChanges,
+                "category" to t.category.name, "difficulty" to t.difficulty, "originalEstimateMinutes" to t.originalEstimateMinutes) }),
             "events" to arr(state.events.map { e -> obj("id" to e.id, "title" to e.title, "start" to e.start.toString(), "end" to e.end.toString(), "group" to e.group, "source" to e.source.name, "sourceIds" to arr(e.sourceIds)) }),
             "schedule" to obj("version" to state.schedule.version, "generatedAt" to state.schedule.generatedAt?.toString(),
                 "blocks" to arr(state.schedule.blocks.map { b -> obj("id" to b.id, "taskId" to b.taskId, "start" to b.start.toString(), "end" to b.end.toString(), "locked" to b.locked) }),
                 "risks" to arr(state.schedule.risks.map { r -> obj("title" to r.title, "message" to r.message, "missingMinutes" to r.missingMinutes) })),
             "reminded" to arr(state.reminded),
             "aiReports" to arr(state.aiReports.map { r -> obj("id" to r.id, "type" to r.type.name, "title" to r.title,
-                "summary" to r.summary, "bullets" to arr(r.bullets), "generatedAt" to r.generatedAt.toString()) })).toString().toByteArray(Charsets.UTF_8)
+                "summary" to r.summary, "bullets" to arr(r.bullets), "generatedAt" to r.generatedAt.toString()) }),
+            "executionHistory" to arr(state.executionHistory.map { e -> obj("id" to e.id, "taskId" to e.taskId,
+                "category" to e.category.name, "group" to e.group, "plannedStart" to e.plannedStart.toString(),
+                "plannedMinutes" to e.plannedMinutes, "actualMinutes" to e.actualMinutes, "outcome" to e.outcome.name,
+                "recordedAt" to e.recordedAt.toString()) })).toString().toByteArray(Charsets.UTF_8)
     }
 
     private fun proposal(p: Proposal) = obj("action" to p.action.name, "title" to p.title, "targetId" to p.targetId,
@@ -43,11 +48,15 @@ object StateCodec {
         "minutes" to p.minutes, "reasons" to arr(p.reasons), "autoSafe" to p.autoSafe,
         "confidence" to p.confidence, "importance" to p.importance, "evidence" to arr(p.evidence),
         "inferredFields" to arr(p.inferredFields), "questions" to arr(p.questions), "subTasks" to arr(p.subTasks),
-        "aiGenerated" to p.aiGenerated, "changeSummary" to p.changeSummary)
+        "aiGenerated" to p.aiGenerated, "changeSummary" to p.changeSummary,
+        "uncertainty" to p.uncertainty?.let { u -> obj("overall" to u.overall,
+            "blockingFields" to arr(u.blockingFields), "questions" to arr(u.questions), "mayAutoCreate" to u.mayAutoCreate,
+            "fields" to obj("action" to u.fields.action, "title" to u.fields.title, "time" to u.fields.time,
+                "target" to u.fields.target, "evidence" to u.fields.evidence)) })
 
     fun decode(bytes: ByteArray): LocalState {
         val root = JSONObject(String(bytes, Charsets.UTF_8))
-        require(root.getInt("schema") == 1) { "本地数据版本不受支持" }
+        require(root.getInt("schema") in 1..2) { "本地数据版本不受支持" }
         val p = root.getJSONObject("preferences")
         val preferences = Preferences(p.getBoolean("enabled"), p.rows("groups").map { GroupRule(Source.valueOf(it.getString("source")), it.getString("name")) },
             p.optBoolean("autoCreate"), p.getInt("startHour"), p.getInt("endHour"), p.getString("zone"), p.optBoolean("reminders", true),
@@ -55,23 +64,41 @@ object StateCodec {
             p.optBoolean("canvasEnabled"), p.optString("canvasBaseUrl"), p.optString("canvasAccessToken"))
         val notices = root.rows("notices").map { n ->
             val i = n.getJSONObject("input"); val q = n.getJSONObject("proposal")
+            val uncertainty = q.optJSONObject("uncertainty")?.let { u ->
+                val f = u.getJSONObject("fields")
+                UncertaintyAssessment(FieldConfidence(f.getDouble("action"), f.getDouble("title"), f.getDouble("time"),
+                    f.getDouble("target"), f.getDouble("evidence")), u.getDouble("overall"), u.strings("blockingFields"),
+                    u.strings("questions"), u.optBoolean("mayAutoCreate"))
+            }
             Notice(n.getString("id"), Incoming(Source.valueOf(i.getString("source")), i.getString("group"), i.getString("content"), Instant.parse(i.getString("receivedAt")), i.optString("sender"), i.optString("sourceKey")),
-                Proposal(Action.valueOf(q.getString("action")), q.getString("title"), q.stringOrNull("targetId"), q.instant("deadline"), q.instant("start"), q.instant("end"), if (q.isNull("minutes")) null else q.getInt("minutes"), q.strings("reasons"), q.optBoolean("autoSafe"),
-                    if (q.has("confidence") && !q.isNull("confidence")) q.getDouble("confidence") else null, q.optInt("importance", 3),
-                    q.strings("evidence"), q.strings("inferredFields"), q.strings("questions"), q.strings("subTasks"),
-                    q.optBoolean("aiGenerated"), q.optString("changeSummary")),
+                Proposal(action = Action.valueOf(q.getString("action")), title = q.getString("title"), targetId = q.stringOrNull("targetId"),
+                    deadline = q.instant("deadline"), start = q.instant("start"), end = q.instant("end"),
+                    minutes = if (q.isNull("minutes")) null else q.getInt("minutes"), reasons = q.strings("reasons"), autoSafe = q.optBoolean("autoSafe"),
+                    confidence = if (q.has("confidence") && !q.isNull("confidence")) q.getDouble("confidence") else null,
+                    importance = q.optInt("importance", 3), evidence = q.strings("evidence"), inferredFields = q.strings("inferredFields"),
+                    questions = q.strings("questions"), subTasks = q.strings("subTasks"), aiGenerated = q.optBoolean("aiGenerated"),
+                    changeSummary = q.optString("changeSummary"), uncertainty = uncertainty),
                 NoticeStatus.valueOf(n.getString("status")), n.stringOrNull("appliedId"))
         }
-        val tasks = root.rows("tasks").map { t -> Task(t.getString("id"), t.getString("title"), t.getString("group"), Source.valueOf(t.getString("source")), t.instant("deadline"),
-            t.getInt("minutes"), t.getInt("remaining"), t.getInt("priority"), t.getBoolean("splittable"), TaskStatus.valueOf(t.getString("status")), t.optBoolean("deadlineLocked"), t.strings("sourceIds"),
-            t.rows("subTasks").map { s -> SubTask(s.optString("id", newId()), s.getString("title"), s.optBoolean("done")) },
-            if (t.has("actualMinutes") && !t.isNull("actualMinutes")) t.getInt("actualMinutes") else null, t.instant("completedAt"), t.optInt("deadlineChanges")) }
+        val tasks = root.rows("tasks").map { t -> Task(id = t.getString("id"), title = t.getString("title"), group = t.getString("group"),
+            source = Source.valueOf(t.getString("source")), deadline = t.instant("deadline"), minutes = t.getInt("minutes"), remaining = t.getInt("remaining"),
+            priority = t.getInt("priority"), splittable = t.getBoolean("splittable"), status = TaskStatus.valueOf(t.getString("status")),
+            deadlineLocked = t.optBoolean("deadlineLocked"), sourceIds = t.strings("sourceIds"),
+            subTasks = t.rows("subTasks").map { s -> SubTask(s.optString("id", newId()), s.getString("title"), s.optBoolean("done")) },
+            actualMinutes = if (t.has("actualMinutes") && !t.isNull("actualMinutes")) t.getInt("actualMinutes") else null,
+            completedAt = t.instant("completedAt"), deadlineChanges = t.optInt("deadlineChanges"),
+            category = runCatching { TaskCategory.valueOf(t.optString("category", TaskCategory.AUTO.name)) }.getOrDefault(TaskCategory.AUTO),
+            difficulty = t.optInt("difficulty", 3).coerceIn(1, 5), originalEstimateMinutes = t.optInt("originalEstimateMinutes", t.getInt("minutes"))) }
         val events = root.rows("events").map { e -> FixedEvent(e.getString("id"), e.getString("title"), Instant.parse(e.getString("start")), Instant.parse(e.getString("end")), e.getString("group"), Source.valueOf(e.getString("source")), e.strings("sourceIds")) }
         val s = root.getJSONObject("schedule")
         val schedule = Schedule(s.getInt("version"), s.rows("blocks").map { b -> Block(b.getString("id"), b.getString("taskId"), Instant.parse(b.getString("start")), Instant.parse(b.getString("end")), b.getBoolean("locked")) },
             s.rows("risks").map { r -> Risk(r.getString("title"), r.getString("message"), r.getInt("missingMinutes")) }, s.instant("generatedAt"))
         val reports = root.rows("aiReports").map { r -> AiReport(r.getString("id"), AiReportType.valueOf(r.getString("type")),
             r.getString("title"), r.getString("summary"), r.strings("bullets"), Instant.parse(r.getString("generatedAt"))) }
-        return LocalState(preferences, notices, tasks, events, schedule, root.strings("reminded").toSet(), reports)
+        val history = root.rows("executionHistory").map { e -> ExecutionRecord(e.getString("id"), e.getString("taskId"),
+            TaskCategory.valueOf(e.getString("category")), e.optString("group"), Instant.parse(e.getString("plannedStart")),
+            e.getInt("plannedMinutes"), if (e.has("actualMinutes") && !e.isNull("actualMinutes")) e.getInt("actualMinutes") else null,
+            ExecutionOutcome.valueOf(e.getString("outcome")), Instant.parse(e.getString("recordedAt"))) }
+        return LocalState(preferences, notices, tasks, events, schedule, root.strings("reminded").toSet(), reports, history)
     }
 }

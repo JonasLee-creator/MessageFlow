@@ -32,7 +32,8 @@ fun formatTime(time: Instant?, zone: String, short: Boolean = false): String = t
     }
 }
 
-@Composable fun TaskEditor(task: Task?, zone: String, durationSuggestion: (String) -> Int?, onDismiss: () -> Unit, onSave: (Task) -> Unit) {
+@Composable fun TaskEditor(task: Task?, state: LocalState, onDismiss: () -> Unit, onSave: (Task) -> Unit) {
+    val zone = state.preferences.zone
     var title by rememberSaveable { mutableStateOf(task?.title.orEmpty()) }
     var group by rememberSaveable { mutableStateOf(task?.group.orEmpty()) }
     var minutes by rememberSaveable { mutableStateOf((task?.minutes ?: 60).toString()) }
@@ -41,17 +42,34 @@ fun formatTime(time: Instant?, zone: String, short: Boolean = false): String = t
     var split by rememberSaveable { mutableStateOf(task?.splittable ?: true) }
     var locked by rememberSaveable { mutableStateOf(task?.deadlineLocked ?: false) }
     var actual by rememberSaveable { mutableStateOf(task?.actualMinutes?.toString().orEmpty()) }
+    var categoryName by rememberSaveable { mutableStateOf((task?.category ?: TaskCategory.AUTO).name) }
+    var difficulty by rememberSaveable { mutableStateOf((task?.difficulty ?: 3).toString()) }
     var subTasks by rememberSaveable { mutableStateOf(task?.subTasks?.joinToString("\n") { it.title }.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var categoryMenu by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(if (task == null) "新建任务" else "编辑任务") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(title, { title = it }, label = { Text("任务名称") }, singleLine = true)
             OutlinedTextField(group, { group = it }, label = { Text("课程 / 分组") }, singleLine = true)
+            Box {
+                OutlinedButton(onClick = { categoryMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("任务类型：${TaskCategory.valueOf(categoryName).label}")
+                }
+                DropdownMenu(categoryMenu, { categoryMenu = false }) {
+                    TaskCategory.entries.forEach { category -> DropdownMenuItem(text = { Text(category.label) }, onClick = {
+                        categoryName = category.name; categoryMenu = false
+                    }) }
+                }
+            }
+            OutlinedTextField(difficulty, { difficulty = it }, label = { Text("难度（1–5）") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
             OutlinedTextField(minutes, { minutes = it }, label = { Text("预计总耗时（分钟）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            durationSuggestion(title)?.let { suggested ->
+            PersonalTimeModel.durationSuggestion(title, group, TaskCategory.valueOf(categoryName), difficulty.toIntOrNull() ?: 3,
+                minutes.toIntOrNull() ?: 60, state)?.let { suggested ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("根据历史记录建议约 $suggested 分钟", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { minutes = suggested.toString(); if (task == null) remaining = suggested.toString() }) { Text("采用") }
+                    Text("根据${suggested.basis}（${suggested.sampleCount}个样本），历史倍率 %.1f，建议约 ${suggested.minutes} 分钟".format(suggested.multiplier),
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { minutes = suggested.minutes.toString(); if (task == null) remaining = suggested.minutes.toString() }) { Text("采用") }
                 }
             }
             if (task != null) OutlinedTextField(remaining, { remaining = it }, label = { Text("剩余耗时（分钟）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
@@ -65,14 +83,17 @@ fun formatTime(time: Instant?, zone: String, short: Boolean = false): String = t
         }
     }, confirmButton = { TextButton(onClick = {
         val duration = minutes.toIntOrNull(); val left = if (task == null) duration else remaining.toIntOrNull(); val spent = actual.toIntOrNull()
+        val level = difficulty.toIntOrNull()
         val steps = subTasks.lines().map(String::trim).filter(String::isNotBlank).distinct()
         if (title.isBlank() || title.length > 200 || duration == null || duration !in 1..20160 || left == null || left !in 0..20160) { error = "请填写名称和有效耗时"; return@TextButton }
         if (actual.isNotBlank() && (spent == null || spent !in 1..20160)) { error = "实际用时需为1–20160分钟"; return@TextButton }
+        if (level == null || level !in 1..5) { error = "难度需为1–5"; return@TextButton }
         if (steps.size > 8 || steps.any { it.length > 120 }) { error = "子任务最多8项，每项不超过120字"; return@TextButton }
         val previous = task?.subTasks.orEmpty().associateBy { it.title }
         onSave((task ?: Task(title = title)).copy(title = title.trim(), group = group.trim(), minutes = duration, remaining = left,
             deadline = dueText?.let(Instant::parse), splittable = split, deadlineLocked = locked, actualMinutes = spent,
-            subTasks = steps.map { previous[it] ?: SubTask(title = it) }))
+            subTasks = steps.map { previous[it] ?: SubTask(title = it) }, category = TaskCategory.valueOf(categoryName),
+            difficulty = level, originalEstimateMinutes = task?.originalEstimateMinutes ?: duration))
     }) { Text("保存并排程") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
 }
 
@@ -174,7 +195,16 @@ fun formatTime(time: Instant?, zone: String, short: Boolean = false): String = t
             }
             if (original.inferredFields.isNotEmpty()) Text("AI 推测字段：${original.inferredFields.joinToString("、")}", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
             if (original.subTasks.isNotEmpty()) Text("建议拆解：\n${original.subTasks.joinToString("\n") { "• $it" }}", style = MaterialTheme.typography.bodySmall)
-            original.confidence?.let { Text("置信度 ${(it * 100).toInt()}% · 重要性 ${original.importance}/5", style = MaterialTheme.typography.bodySmall) }
+            original.uncertainty?.let { uncertainty ->
+                val f = uncertainty.fields
+                Text("本地字段级校验", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text("动作 ${(f.action * 100).toInt()}% · 名称 ${(f.title * 100).toInt()}% · 时间 ${(f.time * 100).toInt()}% · 目标 ${(f.target * 100).toInt()}% · 证据 ${(f.evidence * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall)
+                Text("综合 ${(uncertainty.overall * 100).toInt()}%${if (uncertainty.mayAutoCreate) " · 满足自动创建阈值" else " · 需要人工核对"}",
+                    color = if (uncertainty.mayAutoCreate) Teal else MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodySmall)
+                uncertainty.questions.forEach { Text("待确认：$it", style = MaterialTheme.typography.bodySmall) }
+            }
             Text(if (original.aiGenerated) "DeepSeek 辅助识别，确认后才会写入计划。" else "本地规则识别，确认后自动排程。", style = MaterialTheme.typography.bodySmall)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }

@@ -76,7 +76,9 @@ import kotlinx.coroutines.delay
                     onCancel = { vm.run { vm.repository.completeTask(it.id, true) } }, onSources = { sources = it },
                     onToggleSubTask = { task, sub -> vm.run { vm.repository.toggleSubTask(task.id, sub.id) } })
                 3 -> CalendarPage(state, today.plusDays(dayOffset.toLong()), dayOffset, { dayOffset = it }, busy,
-                    onLock = { vm.run { vm.repository.lock(it.id) } }, onEditEvent = { editEvent = it; editor = "event" }, onCancelEvent = { vm.run { vm.repository.cancelEvent(it.id) } })
+                    onLock = { vm.run { vm.repository.lock(it.id) } },
+                    onOutcome = { block, outcome -> vm.run { vm.repository.recordExecution(block.id, outcome) } },
+                    onEditEvent = { editEvent = it; editor = "event" }, onCancelEvent = { vm.run { vm.repository.cancelEvent(it.id) } })
                 4 -> SettingsPage(state.preferences, busy, lastNotification, canvasStatus,
                     onSave = { p -> vm.run { vm.repository.preferences(p) } },
                     onConnectCanvas = { url, token -> vm.run { vm.repository.configureCanvas(url, token) } },
@@ -86,7 +88,7 @@ import kotlinx.coroutines.delay
         }
     }
     when (editor) {
-        "task" -> TaskEditor(editTask, zone, { title -> IntelligenceEngine.durationSuggestion(title, state) }, { editor = null }) { task -> vm.run { vm.repository.saveTask(task) }; editor = null }
+        "task" -> TaskEditor(editTask, state, { editor = null }) { task -> vm.run { vm.repository.saveTask(task) }; editor = null }
         "event" -> EventEditor(editEvent, zone, { editor = null }) { event -> vm.run { vm.repository.saveEvent(event) }; editor = null }
         "message" -> MessageEditor(state.preferences.aiEnabled, { editor = null }) { input -> vm.run { vm.repository.manual(input) }; editor = null; tab = 1 }
     }
@@ -224,7 +226,12 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
             }
             Text(n.input.content, lineHeight = 24.sp)
             Text("${n.proposal.action.label} · ${n.proposal.title}", color = Teal, fontWeight = FontWeight.Medium)
-            if (n.proposal.aiGenerated) Text("AI 置信度 ${((n.proposal.confidence ?: 0.0) * 100).toInt()}% · 重要性 ${n.proposal.importance}/5", style = MaterialTheme.typography.bodySmall, color = Teal)
+            n.proposal.uncertainty?.let { uncertainty ->
+                Text("本地校验置信度 ${(uncertainty.overall * 100).toInt()}% · 重要性 ${n.proposal.importance}/5",
+                    style = MaterialTheme.typography.bodySmall, color = Teal)
+                if (uncertainty.blockingFields.isNotEmpty()) Text("需要确认：${uncertainty.blockingFields.joinToString("、")}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            }
             if (n.proposal.changeSummary.isNotBlank()) Text(n.proposal.changeSummary, style = MaterialTheme.typography.bodySmall)
             n.proposal.deadline?.let { Text("截止：${formatTime(it, state.preferences.zone)}", style = MaterialTheme.typography.bodySmall) }
             n.proposal.start?.let { Text("日程：${formatTime(it, state.preferences.zone)} — ${formatTime(n.proposal.end, state.preferences.zone)}", style = MaterialTheme.typography.bodySmall) }
@@ -255,6 +262,15 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
                 Text(task.title, Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             }
             Text("${task.group.ifBlank { "个人任务" }} · 剩余 ${task.remaining} 分钟", color = Muted, style = MaterialTheme.typography.bodySmall)
+            Text("${PersonalTimeModel.resolvedCategory(task).label} · 难度 ${task.difficulty}/5", color = Muted, style = MaterialTheme.typography.bodySmall)
+            IntelligenceEngine.personalDurationSuggestion(task, state)?.let { insight ->
+                if (insight.sampleCount > 0) Text("个人耗时模型：历史倍率 %.1f，建议约 ${insight.minutes} 分钟".format(insight.multiplier),
+                    color = Teal, style = MaterialTheme.typography.bodySmall)
+            }
+            PersonalTimeModel.bestWindow(task, state)?.let { insight -> Text(
+                "较适合：${insight.label} · 历史完成倾向 ${(insight.successRate * 100).toInt()}%（${insight.sampleCount}次）",
+                color = Teal, style = MaterialTheme.typography.bodySmall)
+            }
             Text("截止 ${formatTime(task.deadline, state.preferences.zone)}${if (task.deadlineLocked) " · 已锁定" else ""}", color = Teal, style = MaterialTheme.typography.bodySmall)
             task.subTasks.forEach { sub -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(sub.done, { onToggleSubTask(task, sub) }, enabled = !busy && task.status == TaskStatus.ACTIVE)
@@ -270,7 +286,9 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
     }
 }
 
-@Composable private fun CalendarPage(state: LocalState, day: LocalDate, offset: Int, select: (Int) -> Unit, busy: Boolean, onLock: (Block) -> Unit, onEditEvent: (FixedEvent) -> Unit, onCancelEvent: (FixedEvent) -> Unit) {
+@Composable private fun CalendarPage(state: LocalState, day: LocalDate, offset: Int, select: (Int) -> Unit, busy: Boolean,
+    onLock: (Block) -> Unit, onOutcome: (Block, ExecutionOutcome) -> Unit,
+    onEditEvent: (FixedEvent) -> Unit, onCancelEvent: (FixedEvent) -> Unit) {
     val rows = entries(state, day)
     LazyColumn(contentPadding = pagePadding, verticalArrangement = gaps) {
         item { PageHeading("MAKE TIME FOR WHAT MATTERS", "日历，有条不紊。", "先安排临近截止的任务，再考虑优先级。") }
@@ -282,7 +300,14 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
         item { Text("${day.monthValue}月${day.dayOfMonth}日 · 排程 v${state.schedule.version}", fontWeight = FontWeight.Bold) }
         if (rows.isEmpty()) item { EmptyPanel("这一天，留有余地", "没有固定日程或已分配的任务时间。") }
         items(rows) { row -> Timeline(row, state.preferences.zone) {
-            row.block?.let { block -> TextButton(onClick = { onLock(block) }, enabled = !busy) { Icon(if (block.locked) Icons.Outlined.LockOpen else Icons.Outlined.Lock, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(if (block.locked) "解锁时间" else "锁定时间") } }
+            row.block?.let { block -> Column {
+                TextButton(onClick = { onLock(block) }, enabled = !busy) { Icon(if (block.locked) Icons.Outlined.LockOpen else Icons.Outlined.Lock, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(if (block.locked) "解锁时间" else "锁定时间") }
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    TextButton(onClick = { onOutcome(block, ExecutionOutcome.COMPLETED) }, enabled = !busy) { Text("完成时段") }
+                    TextButton(onClick = { onOutcome(block, ExecutionOutcome.SKIPPED) }, enabled = !busy) { Text("跳过") }
+                    TextButton(onClick = { onOutcome(block, ExecutionOutcome.DELAYED) }, enabled = !busy) { Text("延后") }
+                }
+            } }
             row.event?.let { event -> Row { TextButton(onClick = { onEditEvent(event) }, enabled = !busy) { Text("编辑日程") }; TextButton(onClick = { onCancelEvent(event) }, enabled = !busy) { Text("取消日程") } } }
         } }
         item { Text("排程范围：未来14天，每天 ${state.preferences.startHour}:00–${state.preferences.endHour}:00。时间不足会显示缺口，不会安排到截止之后。", color = Muted, style = MaterialTheme.typography.bodySmall) }

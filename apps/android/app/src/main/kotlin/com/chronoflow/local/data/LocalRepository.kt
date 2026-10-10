@@ -106,6 +106,8 @@ class LocalRepository(context: Context) {
     suspend fun saveEvent(event: FixedEvent) = change { LocalEngine.saveEvent(it, event, Instant.now()) }
     suspend fun cancelEvent(id: String) = change(replan = true) { it.copy(events = it.events.filterNot { e -> e.id == id }) }
     suspend fun lock(id: String) = change(replan = true) { it.copy(schedule = it.schedule.copy(blocks = it.schedule.blocks.map { b -> if (b.id != id) b else b.copy(locked = !b.locked) })) }
+    suspend fun recordExecution(blockId: String, outcome: ExecutionOutcome, actualMinutes: Int? = null) =
+        change(replan = true) { PersonalTimeModel.record(it, blockId, outcome, actualMinutes, Instant.now()) }
     suspend fun configureCanvas(baseUrl: String, accessToken: String) {
         awaitReady()
         val normalized = CanvasClient.normalizeBaseUrl(baseUrl)

@@ -35,7 +35,9 @@ object LocalScheduler {
             var slot = date.atTime(prefs.startHour, 0).atZone(zone).toInstant()
             val end = if (prefs.endHour == 24) date.plusDays(1).atStartOfDay(zone).toInstant() else date.atTime(prefs.endHour, 0).atZone(zone).toInstant()
             while (slot.plusSeconds(STEP) <= end) {
-                if (slot >= now && state.events.none { overlaps(slot, slot.plusSeconds(STEP), it.start, it.end) } && preserved.none { overlaps(slot, slot.plusSeconds(STEP), it.start, it.end) }) slots += slot
+                if (slot >= now && state.events.none { overlaps(slot, slot.plusSeconds(STEP), it.start, it.end) } &&
+                    preserved.none { overlaps(slot, slot.plusSeconds(STEP), it.start, it.end) } &&
+                    state.executionHistory.none { it.plannedStart == slot }) slots += slot
                 slot = slot.plusSeconds(STEP)
             }
         }
@@ -49,9 +51,15 @@ object LocalScheduler {
                 continue
             }
             val eligible = slots.filter { it in available && (task.deadline == null || it.plusSeconds(STEP) <= task.deadline) }
-            val chosen = if (task.splittable) eligible.take(needed) else {
+            val chosen = if (task.splittable) {
+                eligible.sortedWith(compareByDescending<Instant> { PersonalTimeModel.slotScore(task, it, state) }.thenBy { it })
+                    .take(needed).sorted()
+            } else {
                 val set = eligible.toSet()
-                val start = eligible.firstOrNull { candidate -> (0 until needed).all { candidate.plusSeconds(STEP * it) in set } }
+                val start = eligible.filter { candidate -> (0 until needed).all { candidate.plusSeconds(STEP * it) in set } }
+                    .maxWithOrNull(compareBy<Instant> {
+                        (0 until needed).map { offset -> PersonalTimeModel.slotScore(task, it.plusSeconds(STEP * offset), state) }.average()
+                    }.thenBy { -it.epochSecond })
                 if (start == null) emptyList() else (0 until needed).map { start.plusSeconds(STEP * it) }
             }
             if (chosen.size < needed) risks += Risk(task.title,

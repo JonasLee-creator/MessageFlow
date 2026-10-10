@@ -17,7 +17,8 @@ object LocalEngine {
                 Duration.between(old.input.receivedAt, input.receivedAt).abs() <= Duration.ofMinutes(10))
         }
         if (duplicate) return state
-        val safe = proposals.ifEmpty { listOf(LocalParser.parse(input, state)) }.take(10)
+        val baseline = LocalParser.parse(input, state)
+        val safe = proposals.ifEmpty { listOf(baseline) }.take(10).map { UncertaintyEngine.assess(input, it, state, baseline) }
         val notices = safe.mapIndexed { index, proposal ->
             Notice(input = input.copy(sourceKey = input.sourceKey + if (safe.size > 1) "#${index + 1}" else ""), proposal = proposal,
                 status = if (proposal.action == Action.IGNORE) NoticeStatus.IGNORED else NoticeStatus.REVIEW)
@@ -82,7 +83,8 @@ object LocalEngine {
 
     fun saveTask(state: LocalState, task: Task, now: Instant): LocalState {
         validateTitle(task.title)
-        require(task.minutes in 1..20160 && task.remaining in 0..20160 && task.priority in 1..10) { "请检查耗时和优先级" }
+        require(task.minutes in 1..20160 && task.remaining in 0..20160 && task.priority in 1..10 &&
+            task.difficulty in 1..5 && task.originalEstimateMinutes in 1..20160) { "请检查耗时、难度和优先级" }
         val next = state.copy(tasks = state.tasks.filterNot { it.id == task.id } + task)
         return next.copy(schedule = LocalScheduler.plan(next, now))
     }

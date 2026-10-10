@@ -15,6 +15,11 @@ enum class Action(val label: String) {
 }
 enum class NoticeStatus { REVIEW, APPLIED, IGNORED }
 enum class TaskStatus { ACTIVE, COMPLETED, CANCELLED }
+enum class TaskCategory(val label: String) {
+    AUTO("自动识别"), EXPERIMENT("实验"), REPORT("报告"), PROGRAMMING("编程"), REVIEW("复习"),
+    MEMORIZATION("背诵"), READING("阅读"), OTHER("其他")
+}
+enum class ExecutionOutcome(val label: String) { COMPLETED("完成"), SKIPPED("跳过"), DELAYED("延后") }
 enum class AiReportType(val label: String) { DAILY("今日摘要"), RISK("风险预测"), WEEKLY("每周复盘") }
 data class GroupRule(val source: Source, val name: String)
 data class Preferences(
@@ -44,6 +49,14 @@ data class Proposal(
     val evidence: List<String> = emptyList(), val inferredFields: List<String> = emptyList(),
     val questions: List<String> = emptyList(), val subTasks: List<String> = emptyList(),
     val aiGenerated: Boolean = false, val changeSummary: String = "",
+    val uncertainty: UncertaintyAssessment? = null,
+)
+data class FieldConfidence(
+    val action: Double, val title: Double, val time: Double, val target: Double, val evidence: Double,
+)
+data class UncertaintyAssessment(
+    val fields: FieldConfidence, val overall: Double, val blockingFields: List<String> = emptyList(),
+    val questions: List<String> = emptyList(), val mayAutoCreate: Boolean = false,
 )
 data class Notice(
     val id: String = newId(), val input: Incoming, val proposal: Proposal,
@@ -56,6 +69,8 @@ data class Task(
     val deadlineLocked: Boolean = false, val sourceIds: List<String> = emptyList(),
     val subTasks: List<SubTask> = emptyList(), val actualMinutes: Int? = null,
     val completedAt: Instant? = null, val deadlineChanges: Int = 0,
+    val category: TaskCategory = TaskCategory.AUTO, val difficulty: Int = 3,
+    val originalEstimateMinutes: Int = minutes,
 )
 data class SubTask(val id: String = newId(), val title: String, val done: Boolean = false)
 data class FixedEvent(
@@ -63,6 +78,11 @@ data class FixedEvent(
     val group: String = "", val source: Source = Source.MANUAL, val sourceIds: List<String> = emptyList(),
 )
 data class Block(val id: String = newId(), val taskId: String, val start: Instant, val end: Instant, val locked: Boolean = false)
+data class ExecutionRecord(
+    val id: String = newId(), val taskId: String, val category: TaskCategory, val group: String,
+    val plannedStart: Instant, val plannedMinutes: Int, val actualMinutes: Int? = null,
+    val outcome: ExecutionOutcome, val recordedAt: Instant = Instant.now(),
+)
 data class Risk(val title: String, val message: String, val missingMinutes: Int = 0)
 data class Schedule(val version: Int = 0, val blocks: List<Block> = emptyList(), val risks: List<Risk> = emptyList(), val generatedAt: Instant? = null)
 data class AiReport(
@@ -73,5 +93,5 @@ data class LocalState(
     val preferences: Preferences = Preferences(), val notices: List<Notice> = emptyList(),
     val tasks: List<Task> = emptyList(), val events: List<FixedEvent> = emptyList(),
     val schedule: Schedule = Schedule(), val reminded: Set<String> = emptySet(),
-    val aiReports: List<AiReport> = emptyList(),
+    val aiReports: List<AiReport> = emptyList(), val executionHistory: List<ExecutionRecord> = emptyList(),
 )
