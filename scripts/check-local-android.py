@@ -13,9 +13,20 @@ ns = "{http://schemas.android.com/apk/res/android}"
 permissions = {p.get(ns + "name") for p in manifest.findall("uses-permission")}
 assert "android.permission.INTERNET" in permissions
 assert manifest.find("application").get(ns + "allowBackup") == "false"
-service = manifest.find("application/service")
-assert service.get(ns + "permission") == "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-assert service.get(ns + "exported") == "false"
+services = {service.get(ns + "name"): service for service in manifest.findall("application/service")}
+notification_service = services[".notifications.GroupNotificationListener"]
+assert notification_service.get(ns + "permission") == "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+assert notification_service.get(ns + "exported") == "false"
+accessibility_service = services[".accessibility.WeChatAccessibilityService"]
+assert accessibility_service.get(ns + "permission") == "android.permission.BIND_ACCESSIBILITY_SERVICE"
+assert accessibility_service.get(ns + "exported") == "true"
+metadata = accessibility_service.find("meta-data")
+assert metadata.get(ns + "name") == "android.accessibilityservice"
+assert metadata.get(ns + "resource") == "@xml/accessibility_service_config"
+accessibility_config = ET.parse(main / "res/xml/accessibility_service_config.xml").getroot()
+assert accessibility_config.get(ns + "packageNames") == "com.tencent.mm"
+assert accessibility_config.get(ns + "canPerformGestures") == "false"
+assert accessibility_config.get(ns + "canRetrieveWindowContent") == "true"
 settings = (android / "settings.gradle.kts").read_text(encoding="utf-8")
 build = (android / "app/build.gradle.kts").read_text(encoding="utf-8")
 assert "flutter" not in settings.lower() + build.lower()
@@ -28,5 +39,5 @@ for file in domain.glob("*.kt"):
     assert "import android." not in file.read_text(encoding="utf-8")
 print(f"{len(xmls)} Android XML files parse successfully")
 print("Opt-in DeepSeek network permission present; no Flutter build dependency; backup disabled")
-print("Notification binding, component sources and pure Kotlin domain checks passed")
+print("Notification/accessibility binding, privacy limits, component sources and pure Kotlin domain checks passed")
 print("This is not Gradle/Android compilation or real-device verification.")
