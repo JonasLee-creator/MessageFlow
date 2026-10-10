@@ -31,7 +31,6 @@ import kotlinx.coroutines.delay
     val diskError by vm.repository.storageError.collectAsStateWithLifecycle()
     val aiError by vm.repository.aiError.collectAsStateWithLifecycle()
     val lastNotification by vm.repository.lastNotification.collectAsStateWithLifecycle()
-    val lastAccessibilityCapture by vm.repository.lastAccessibilityCapture.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
     var editTask by remember { mutableStateOf<Task?>(null) }
@@ -77,7 +76,7 @@ import kotlinx.coroutines.delay
                     onToggleSubTask = { task, sub -> vm.run { vm.repository.toggleSubTask(task.id, sub.id) } })
                 3 -> CalendarPage(state, today.plusDays(dayOffset.toLong()), dayOffset, { dayOffset = it }, busy,
                     onLock = { vm.run { vm.repository.lock(it.id) } }, onEditEvent = { editEvent = it; editor = "event" }, onCancelEvent = { vm.run { vm.repository.cancelEvent(it.id) } })
-                4 -> SettingsPage(state.preferences, busy, lastNotification, lastAccessibilityCapture, onSave = { p -> vm.run { vm.repository.preferences(p) } })
+                4 -> SettingsPage(state.preferences, busy, lastNotification, onSave = { p -> vm.run { vm.repository.preferences(p) } })
             }
         }
     }

@@ -98,21 +98,6 @@ object CoreChecks {
             check(p.end == null && !p.autoSafe)
         }
         val enabled = prefs.copy(enabled = true, groups = listOf(GroupRule(Source.WECHAT, "网络课"), GroupRule(Source.QQ, "QQ课程群")))
-        val foregroundEnabled = enabled.copy(accessibilityCaptureEnabled = true)
-        test("foreground capture requires explicit app consent and exact WeChat group") {
-            check(ForegroundCaptureGuard.allowedGroup(listOf("网络课"), enabled) == null)
-            check(ForegroundCaptureGuard.allowedGroup(listOf("网络课"), foregroundEnabled) == "网络课")
-            check(ForegroundCaptureGuard.allowedGroup(listOf("网络课 (38)"), foregroundEnabled) == "网络课")
-            check(ForegroundCaptureGuard.allowedGroup(listOf("网络课程群2"), foregroundEnabled) == null)
-            check(ForegroundCaptureGuard.allowedGroup(listOf("QQ课程群"), foregroundEnabled) == null)
-        }
-        test("foreground capture removes controls timestamps and duplicate nodes") {
-            val candidates = ForegroundCaptureGuard.messageCandidates(
-                listOf("网络课", "微信", "19:01", "实验四明天提交", "实验四明天提交", "发送"),
-                "网络课",
-            )
-            check(candidates == listOf("实验四明天提交")) { candidates.toString() }
-        }
         fun envelope(pkg: String = Source.WECHAT.packageName, title: String = "网络课") = NotificationEnvelope(pkg, "key", clock.toEpochMilli(), title = title, text = "实验三明天提交")
         test("WeChat exact whitelist") { check(NotificationMatcher.extract(envelope(), enabled).size == 1) }
         test("QQ unread and sender group title") {

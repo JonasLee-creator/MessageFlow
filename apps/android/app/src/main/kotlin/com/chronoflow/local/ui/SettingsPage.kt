@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.chronoflow.local.accessibility.WeChatAccessibilityService
 import com.chronoflow.local.domain.*
 import com.chronoflow.local.notifications.GroupNotificationListener
 import com.chronoflow.local.notifications.Reminders
@@ -32,24 +31,15 @@ private fun access(context: android.content.Context): Boolean {
     return raw.split(':').any { ComponentName.unflattenFromString(it) == component }
 }
 
-private fun accessibilityAccess(context: android.content.Context): Boolean {
-    if (Settings.Secure.getInt(context.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0) != 1) return false
-    val raw = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
-    val component = ComponentName(context, WeChatAccessibilityService::class.java)
-    return raw.split(':').any { ComponentName.unflattenFromString(it) == component }
-}
-
 @Composable fun SettingsPage(
     p: Preferences,
     busy: Boolean,
     lastNotification: String,
-    lastAccessibilityCapture: String,
     onSave: (Preferences) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     var granted by remember { mutableStateOf(access(context)) }
-    var accessibilityGranted by remember { mutableStateOf(accessibilityAccess(context)) }
     var remindersGranted by remember { mutableStateOf(Reminders.allowed(context)) }
     var source by rememberSaveable { mutableStateOf(Source.WECHAT.name) }
     var group by rememberSaveable { mutableStateOf("") }
@@ -63,7 +53,6 @@ private fun accessibilityAccess(context: android.content.Context): Boolean {
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) {
             granted = access(context)
-            accessibilityGranted = accessibilityAccess(context)
             remindersGranted = Reminders.allowed(context)
         } }
         lifecycle.lifecycle.addObserver(observer)
@@ -84,14 +73,7 @@ private fun accessibilityAccess(context: android.content.Context): Boolean {
             }, enabled = !busy) { Text("添加到白名单") }
             p.groups.forEach { rule -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("${rule.source.label} · ${rule.name}", Modifier.weight(1f).padding(vertical = 12.dp))
-                TextButton(onClick = {
-                    val groups = p.groups - rule
-                    onSave(p.copy(
-                        groups = groups,
-                        enabled = p.enabled && groups.isNotEmpty(),
-                        accessibilityCaptureEnabled = p.accessibilityCaptureEnabled && groups.any { it.source == Source.WECHAT },
-                    ))
-                }, enabled = !busy) { Text("移除") }
+                TextButton(onClick = { val groups = p.groups - rule; onSave(p.copy(groups = groups, enabled = p.enabled && groups.isNotEmpty())) }, enabled = !busy) { Text("移除") }
             } }
         } }
         item { Panel {
@@ -129,40 +111,6 @@ private fun accessibilityAccess(context: android.content.Context): Boolean {
             Text("默认先确认。开启自动应用后，仅自动接受日期、时间和耗时完整且无歧义的新事项；修改、取消及模糊信息仍需确认。", style = MaterialTheme.typography.bodySmall, color = Muted)
         } }
         item { Panel {
-            Text("3 · 微信前台采集（可选）", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "解决你正在使用微信时系统不弹通知的问题。需要你在系统设置授权，并在本页单独开启；两项同时满足才会采集。",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(if (accessibilityGranted) "系统无障碍授权已开启" else "系统无障碍授权未开启", color = Teal)
-            Text(
-                "授权后，Android 允许此服务查看微信前台页面。时序只注册微信，只在页面顶部精确匹配白名单群后处理消息区；不会点击、滑动、输入，也不访问微信后台聊天数据库。",
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
-            )
-            OutlinedButton(onClick = {
-                runCatching { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-                    .onFailure { message = "无法打开设置，请在系统设置中搜索“无障碍”或“已下载的应用”。" }
-            }) { Text("打开无障碍授权设置") }
-            Toggle("允许微信前台白名单采集", p.accessibilityCaptureEnabled, enabled = !busy) { enabled ->
-                val hasWeChatGroup = p.groups.any { it.source == Source.WECHAT }
-                when {
-                    enabled && !hasWeChatGroup -> message = "请先添加至少一个微信白名单群"
-                    enabled && !accessibilityGranted -> message = "请先在系统无障碍设置中开启“时序 · 微信前台白名单采集”"
-                    else -> {
-                        onSave(p.copy(accessibilityCaptureEnabled = enabled))
-                        message = null
-                    }
-                }
-            }
-            Text("采集诊断：$lastAccessibilityCapture", style = MaterialTheme.typography.bodySmall, color = Muted)
-            Text(
-                "首次进入白名单群只建立当前屏幕基线；之后新出现的文字才会进入识别。手动向上滚动显示的历史消息会被忽略。启用 DeepSeek 时，捕捉到的新文字会按上方 AI 授权说明发送给 DeepSeek。",
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
-            )
-        } }
-        item { Panel {
             Text("每天可安排的时间", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(start, { start = it }, label = { Text("开始小时") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
@@ -187,6 +135,6 @@ private fun accessibilityAccess(context: android.content.Context): Boolean {
             Text("使用系统普通定时提醒，省电模式或厂商后台限制可能造成延迟，不作为精确闹钟。", style = MaterialTheme.typography.bodySmall, color = Muted)
         } }
         message?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { Text("时序 0.4.0\n通知访问可在后台接收系统已展示的通知；可选无障碍功能只补充采集正在前台显示的微信白名单群新文字。\n原始通知最多保留1000条，卸载或清除应用数据会删除本地计划。", style = MaterialTheme.typography.bodySmall, color = Muted, modifier = Modifier.padding(bottom = 20.dp)) }
+        item { Text("时序 0.3.0\n仅能提取系统实际展示的通知文字。群聊免打扰、隐藏正文或通知被聚合时，可能无法获取，可在「发现」中手动录入。\n原始通知最多保留1000条，卸载或清除应用数据会删除本地计划。", style = MaterialTheme.typography.bodySmall, color = Muted, modifier = Modifier.padding(bottom = 20.dp)) }
     }
 }

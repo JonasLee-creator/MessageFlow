@@ -1,6 +1,6 @@
 # 原生 Android 手机端（本地核心 + 可选 DeepSeek）
 
-更新：2026-10-10。当前范围：手机端提取微信/QQ群通知，并可在用户双重授权后补充识别微信前台白名单群的新文字，使用本地规则或用户主动配置的 DeepSeek API 理解信息并安排日程。主工程是 `apps/android`，旧Flutter与FastAPI工程保留但不参与运行。
+更新：2026-10-10。当前范围：手机端提取微信/QQ群系统通知，使用本地规则或用户主动配置的 DeepSeek API 理解信息并安排日程。主工程是 `apps/android`，旧Flutter与FastAPI工程保留但不参与运行。
 
 ## 所有业务在手机运行
 
@@ -54,16 +54,6 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 7. 如需开始提醒，允许系统显示通知。使用普通非精确定时，省电或后台限制可能造成延迟。
 8. 如需 AI，在「设置」填写 DeepSeek API Key、模型名并明确开启。可在「今天」生成三类报告，在「发现」查看 AI 的依据和置信度。
 
-### 可选：微信前台没有系统通知时
-
-1. 先在白名单添加准确的微信课程群名。
-2. 在「设置 → 微信前台采集」点击「打开无障碍授权设置」。
-3. 在系统列表中选择「时序 · 微信前台白名单采集」，阅读系统风险提示后由用户本人开启。
-4. 返回时序，再打开「允许微信前台白名单采集」。系统授权和 App 内开关缺一不可。
-5. 打开白名单微信群。首次进入只建立当前屏幕基线；保持在该群时，之后新出现且符合本地关键词的文字会进入「发现」。如果已启用 DeepSeek，新文字不受本地关键词限制，并会依照 AI 授权说明发送给 DeepSeek 分析。
-
-该服务在配置中只订阅微信官方包 `com.tencent.mm`，不申请手势能力，不执行点击、滑动或输入。它先读取顶部标题并精确匹配微信白名单；匹配失败时不读取消息区。向上滚动显示的历史内容会作为基线忽略。Android授予无障碍服务的系统能力本身较强，用户可随时关闭 App 内开关或到系统无障碍设置撤销授权。
-
 首次启动无示例假数据、无需登录。尚未授权时，可用「发现→录入通知」先测试流程。
 
 ## 测试句子
@@ -92,9 +82,6 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 - Android没有对所有第三方应用统一提供“这是群聊”标记。请勿将私人联系人名称填入白名单。
 - 仅能读取系统实际提供的通知文字。免打扰、隐藏内容、通知聚合、应用版本和机型差异可能导致遗漏。
 - 不读取聊天数据库、历史聊天或没有产生系统通知的消息。
-- 可选无障碍路径只能补充读取当前前台微信页面的可访问文字。系统授权与 App 内开关必须同时开启；仅处理页面顶部精确匹配的微信白名单群。
-- 首次打开群聊只建立基线，向上滚动的历史内容会被忽略；因此进入群聊前已经出现的消息不会自动补录。
-- 微信更新可能改变页面无障碍结构，导致群名或消息无法识别；设置页显示最近一次采集诊断。
 - 侧载限制或厂商后台管理需要在实际设备中验证，不能保证所有机型行为相同。
 
 ## 本地存储
@@ -123,7 +110,7 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 已实际执行：
 
 - 使用已有IntelliJ Kotlin编译器编译生产domain代码及测试入口。
-- **49项核心检查通过**，包括无障碍双重授权/白名单过滤，以及一项含100组随机排程的冲突与截止约束检查。
+- **47项核心检查通过**，包括通知兼容过滤，以及一项含100组随机排程的冲突与截止约束检查。
 - 整个原生工程Kotlin/Gradle Kotlin DSL的PSI语法解析通过。
 - Gradle Android 完整编译、Debug APK打包与 JVM 单元测试通过。
 - Android XML、可选 DeepSeek 网络权限、无Flutter构建依赖等静态检查通过。
@@ -136,7 +123,7 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 
 脚本默认使用这台电脑已有IntelliJ的Kotlin目录，可通过 `-KotlinHome` 指定其他已安装版本；不会安装工具。
 
-已编写但尚未执行：Android `LocalStorageTest`（schema/加密存储/重启读取）、`NavigationTest`（五页面导航）、原生CI构建配置。本次没有触发云端执行。
+已编写但尚未执行：Android `LocalStorageTest`（schema/加密存储/重启读取）、`NavigationTest`（五页面导航）。原生CI已完成云端编译、测试和APK上传。
 
 尚未验证：真实 DeepSeek API Key 请求、实际微信/QQ通知的完整机型覆盖、设备Keystore重启测试、后台提醒及屏幕/大字体视觉效果。
 
@@ -146,14 +133,12 @@ Debug APK：`apps/android/app/build/outputs/apk/debug/app-debug.apk`。
 2. 添加会议，验证避让；锁定任务块后重排，验证时间不变且工作量没有重复。
 3. 输入延期通知，确认同一任务更新、来源增加；取消后未来时间块消失。
 4. 分别验证白名单微信/QQ群，非白名单群和私人聊天不应进入收件箱。
-5. 开启系统无障碍授权和 App 内微信前台采集开关，在已打开的白名单群等待一条新任务消息；再验证非白名单群、私人聊天、首次进入时已有内容及向上滚动的历史内容均不进入「发现」。
-6. 验证重复、多条、长文本、截断和隐藏内容。
-7. 禁用采集后新通知不进入；断网仍可确认、编辑和排程。
-8. 验证提醒权限拒绝/允许、手机重启、时区变化和省电模式。
+5. 验证重复、多条、长文本、截断和隐藏内容。
+6. 禁用采集后新通知不进入；断网仍可确认、编辑和排程。
+7. 验证提醒权限拒绝/允许、手机重启、时区变化和省电模式。
 
 ## 官方参考
 
 - [通知监听服务](https://developer.android.com/reference/android/service/notification/NotificationListenerService)
 - [通知字段与MessagingStyle](https://developer.android.com/reference/android/app/Notification)
-- [Android 无障碍服务](https://developer.android.com/guide/topics/ui/accessibility/service)
 - [Compose编译插件](https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler)

@@ -21,7 +21,6 @@ class LocalRepository(context: Context) {
     val storageError = MutableStateFlow<String?>(null)
     val aiError = MutableStateFlow<String?>(null)
     val lastNotification = MutableStateFlow("尚未收到微信或 QQ 通知")
-    val lastAccessibilityCapture = MutableStateFlow("尚未开始微信前台采集")
     private val ready = scope.async {
         try { mutable.value = store.load() }
         catch (e: Exception) { storageError.value = "本地数据读取失败，已停止写入以保护文件。请勿清除应用数据。"; throw e }
@@ -51,10 +50,6 @@ class LocalRepository(context: Context) {
         inputs.forEach { smartIngest(it) }
     }
     suspend fun manual(input: Incoming) = smartIngest(input)
-    suspend fun accessibility(input: Incoming) {
-        require(input.source == Source.WECHAT) { "无障碍采集仅支持微信" }
-        smartIngest(input)
-    }
     private suspend fun smartIngest(input: Incoming) {
         awaitReady()
         val snapshot = mutable.value
@@ -109,10 +104,8 @@ class LocalRepository(context: Context) {
         ZoneId.of(p.zone)
         require(p.groups.all { g -> g.source != Source.MANUAL && g.name.isNotBlank() && g.name.length <= 100 }) { "群名无效" }
         require(!p.enabled || p.groups.isNotEmpty()) { "请先添加群名白名单" }
-        require(!p.accessibilityCaptureEnabled || p.groups.any { g -> g.source == Source.WECHAT }) { "微信前台采集需要至少一个微信白名单群" }
         require(!p.aiEnabled || p.deepSeekApiKey.length in 8..512) { "请填写有效的 DeepSeek API Key" }
         require(p.deepSeekModel.isNotBlank() && p.deepSeekModel.length <= 100 && p.deepSeekModel.none { c -> c.isWhitespace() }) { "DeepSeek 模型名称无效" }
-        if (!p.accessibilityCaptureEnabled) lastAccessibilityCapture.value = "App 内微信前台采集开关已关闭"
         it.copy(preferences = p.copy(groups = p.groups.distinct()))
     }
 }
