@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chronoflow-notification-annotation",
+  "title": "ChronoFlow synthetic notification annotation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "split", "scene", "source", "reference_time", "timezone", "text", "context", "gold", "provenance", "annotators", "adjudicated"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^(dev|test)-[0-9]{4}$" },
+    "split": { "enum": ["development", "sealed-test"] },
+    "scene": {
+      "enum": ["new_task", "update_or_cancel", "event", "multi", "ambiguous", "irrelevant", "hard"]
+    },
+    "source": { "enum": ["wechat", "qq", "canvas", "manual"] },
+    "reference_time": { "type": "string" },
+    "timezone": { "const": "Asia/Shanghai" },
+    "text": { "type": "string", "minLength": 2 },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group", "course", "candidate_tasks"],
+      "properties": {
+        "group": { "type": "string" },
+        "course": { "type": "string" },
+        "candidate_tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "title", "course"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "course": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "gold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items", "should_ignore"],
+      "properties": {
+        "should_ignore": { "type": "boolean" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["action", "title", "target_id", "deadline", "start", "end", "minutes", "evidence", "ambiguous_fields", "requires_question"],
+            "properties": {
+              "action": {
+                "enum": ["CREATE_TASK", "UPDATE_TASK", "CANCEL_TASK", "CREATE_EVENT", "UPDATE_EVENT", "CANCEL_EVENT", "IGNORE"]
+              },
+              "title": { "type": "string" },
+              "target_id": { "type": ["string", "null"] },
+              "deadline": { "type": ["string", "null"] },
+              "start": { "type": ["string", "null"] },
+              "end": { "type": ["string", "null"] },
+              "minutes": { "type": ["integer", "null"] },
+              "evidence": { "type": "array", "items": { "type": "string" } },
+              "ambiguous_fields": { "type": "array", "items": { "type": "string" } },
+              "requires_question": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "provenance": { "const": "synthetic" },
+    "annotators": { "type": "array", "items": { "type": "string" } },
+    "adjudicated": { "type": "boolean" }
+  }
+}

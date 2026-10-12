@@ -1,0 +1,39 @@
+{
+  "provenance": "synthetic",
+  "development": 400,
+  "sealed_test": 100,
+  "development_scenes": {
+    "new_task": 90,
+    "update_or_cancel": 70,
+    "event": 60,
+    "multi": 50,
+    "ambiguous": 50,
+    "irrelevant": 50,
+    "hard": 30
+  },
+  "test_scenes": {
+    "new_task": 25,
+    "update_or_cancel": 15,
+    "event": 15,
+    "multi": 15,
+    "ambiguous": 15,
+    "irrelevant": 15
+  },
+  "development_sources": {
+    "wechat": 180,
+    "qq": 120,
+    "canvas": 60,
+    "manual": 40
+  },
+  "test_sources": {
+    "wechat": 45,
+    "qq": 30,
+    "canvas": 15,
+    "manual": 10
+  },
+  "hashes": {
+    "development-v1.jsonl": "84896c873891678be783a635ad0245adfed082010637386dfbc9ff2fc4cd8e21",
+    "sealed-test-input.jsonl": "63de06c85abd6c75bafe5094e4e67f625d99d3ff4dff2c1dc9e3f7bee51d66d8",
+    "sealed-test-gold.jsonl": "bcc5150373423de8b0d06f0b2b41389a06da577cfe3b858794c73105a7fdeb4a"
+  }
+}

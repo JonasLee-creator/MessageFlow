@@ -7,6 +7,8 @@ __pycache__/
 .env
 .local-secret
 .checks/
+evaluation/data/raw-private/
+evaluation/data/sealed-test/sealed-test-gold.jsonl
 .dart_tool/
 build/
 .flutter-plugins-dependencies
