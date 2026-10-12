@@ -1,5 +1,7 @@
 # 时序 · ChronoFlow 手机本地版
 
+网页版交互初稿位于 [apps/web](apps/web/README.md)：包含今天、通知核对、任务、日历、复盘和设置，使用浏览器本地演示数据，尚未接入手机同步、Canvas 或 AI。在 `apps/web` 下执行 `node server.mjs`，访问 `http://127.0.0.1:4173/` 即可预览，无需安装前端依赖。
+
 当前主线是 **Kotlin + Jetpack Compose 原生 Android 应用**：提取微信、QQ 群系统通知，或通过 Canvas 官方 API 同步课程信息，再使用本地规则或用户主动配置的 DeepSeek API 识别内容，并在手机上确认、保存和安排日程。
 
 **Android Studio 请打开 [apps/android](apps/android)，不是旧的 apps/mobile。**
