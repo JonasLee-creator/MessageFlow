@@ -1,0 +1,18 @@
+{
+  "samples": 100,
+  "action_macro_f1": 0.7647,
+  "title_accuracy": 0.2603,
+  "time_accuracy": 0.9041,
+  "target_accuracy": 1.0,
+  "multi_f1": 0.0,
+  "irrelevant_false_positive_rate": 0.0667,
+  "question_recall": 0.0,
+  "hallucination_rate": 0.3,
+  "auto_apply_coverage": 0.12,
+  "wrong_auto_apply_rate": 1.0,
+  "latency_p50_ms": 0,
+  "latency_p95_ms": 1,
+  "avg_prompt_tokens": 0.0,
+  "avg_completion_tokens": 0.0,
+  "api_errors": 0
+}

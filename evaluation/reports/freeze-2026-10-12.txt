@@ -1,0 +1,12 @@
+Git commit: e6cd0b315d11eff0a3e06df4b435257ac9702348
+Evaluation runner SHA-256: 1bcbd30d99536a33c77fc1b0aa81ed703c3dacfa8133a53a79d9480e1d04031a
+DeepSeek channel: Alibaba Bailian, cn-beijing
+Model: deepseek-v4-flash-0731
+temperature: 0.1
+enable_thinking: false
+timezone: Asia/Shanghai
+dataset: synthetic-v1
+sealed input SHA-256: 63de06c85abd6c75bafe5094e4e67f625d99d3ff4dff2c1dc9e3f7bee51d66d8
+freeze date: 2026-10-12
+After this file: do not change the prompt, rules, or thresholds.
+The evaluation runner is local and not in commit e6cd0b3. Its hash above is the frozen runner.

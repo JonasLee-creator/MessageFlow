@@ -1,0 +1,18 @@
+{
+  "samples": 5,
+  "action_macro_f1": 1.0,
+  "title_accuracy": 0.8,
+  "time_accuracy": 1.0,
+  "target_accuracy": null,
+  "multi_f1": 0.0,
+  "irrelevant_false_positive_rate": null,
+  "question_recall": null,
+  "hallucination_rate": 0.2,
+  "auto_apply_coverage": 0.4,
+  "wrong_auto_apply_rate": 0.0,
+  "latency_p50_ms": 4,
+  "latency_p95_ms": 58,
+  "avg_prompt_tokens": 0.0,
+  "avg_completion_tokens": 0.0,
+  "api_errors": 0
+}
