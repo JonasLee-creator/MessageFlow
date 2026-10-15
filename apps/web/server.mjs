@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createAiGateway } from './api/gateway.mjs';
 const root = path.resolve(fileURLToPath(new URL('./dist/', import.meta.url)));
-const types = {'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.json':'application/json; charset=utf-8'};
+const types = {'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.woff2':'font/woff2'};
 const handleAi = createAiGateway();
 const server = http.createServer(async (req,res) => {
   try {

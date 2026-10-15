@@ -49,12 +49,14 @@ import kotlinx.coroutines.delay
     val labels = listOf("今天", "发现", "任务", "日历", "设置")
     val icons = listOf(Icons.Outlined.WbSunny, Icons.Outlined.Inbox, Icons.Outlined.Checklist, Icons.Outlined.CalendarMonth, Icons.Outlined.Tune)
     val pending = state.notices.count { it.status == NoticeStatus.REVIEW }
+    SystemBars(status = Paper, navigation = Ink, lightStatus = true, lightNavigation = false)
     Scaffold(
-        topBar = { TopAppBar(title = { Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp).background(Teal, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.AllInclusive, null, tint = Color.White) }
-            Spacer(Modifier.width(10.dp)); Text("时序", fontWeight = FontWeight.Bold); Spacer(Modifier.width(10.dp)); Text(if (owner.isGuest) "游客" else owner.username, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Teal, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        containerColor = Paper,
+        topBar = { TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = Paper, titleContentColor = Ink, actionIconContentColor = Ink), title = { Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(34.dp).background(Brand, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.AllInclusive, null, tint = Color.White) }
+            Spacer(Modifier.width(10.dp)); Text("时序", fontSize = 22.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.width(10.dp)); Text(if (owner.isGuest) "游客" else owner.username, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         } }, actions = { IconButton(onClick = { vm.run { vm.repository.logout() } }, enabled = !busy) { Icon(Icons.Outlined.Logout, if (owner.isGuest) "返回登录" else "退出登录") }; if (tab != 4) IconButton(onClick = { vm.run { vm.repository.change(replan = true) { it } } }, enabled = !busy) { Icon(Icons.Outlined.Refresh, "重新排程") } }) },
-        bottomBar = { NavigationBar { labels.forEachIndexed { index, label -> NavigationBarItem(selected = index == tab, onClick = { tab = index }, icon = {
+        bottomBar = { NavigationBar(containerColor = Ink) { labels.forEachIndexed { index, label -> NavigationBarItem(selected = index == tab, onClick = { tab = index }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Ink, selectedTextColor = Color.White, indicatorColor = Color.White, unselectedIconColor = Color(0xFFC4BED6), unselectedTextColor = Color(0xFFC4BED6)), icon = {
             if (index == 1 && pending > 0) BadgedBox(badge = { Badge { Text(pending.toString()) } }) { Icon(icons[index], label) }
             else Icon(icons[index], label)
         }, label = { Text(label) }) } } },
@@ -114,7 +116,7 @@ import kotlinx.coroutines.delay
     }
 }
 @Composable fun Panel(modifier: Modifier = Modifier, color: Color = Color.White, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier.fillMaxWidth(), color = color, shape = RoundedCornerShape(20.dp)) {
+    Surface(modifier.fillMaxWidth(), color = color, shape = RoundedCornerShape(20.dp), shadowElevation = 2.dp, tonalElevation = 0.dp) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp), content = content)
     }
 }
@@ -141,7 +143,7 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
 @Composable private fun Timeline(entry: Entry, zone: String, actions: @Composable () -> Unit = {}) {
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.width(58.dp)) { Text(formatTime(entry.start, zone, true), fontWeight = FontWeight.Bold); Text(formatTime(entry.end, zone, true), style = MaterialTheme.typography.labelSmall, color = Muted) }
+            Column(Modifier.width(68.dp)) { Text(formatTime(entry.start, zone, true), fontWeight = FontWeight.Bold); Text(formatTime(entry.end, zone, true), style = MaterialTheme.typography.labelSmall, color = Muted) }
             Box(Modifier.width(3.dp).height(44.dp).background(if (entry.event != null) Color(0xFFB68F4A) else Teal))
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -163,23 +165,23 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
     LazyColumn(contentPadding = pagePadding, verticalArrangement = gaps) {
         item { PageHeading(date.format(DateTimeFormatter.ofPattern("M月d日 EEEE", java.util.Locale.CHINA)), "把今天，安排从容。", "群里的重要消息，变成你的时间计划。") }
         item { Panel(color = Ink) {
-            Text("你的今日节奏", color = Color(0xFFA4D9C2))
+            Text("你的今日节奏", color = Color(0xFFD4CEFF), style = MaterialTheme.typography.titleSmall)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text(rows.size.toString(), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("日程安排", color = Color.White.copy(alpha = .7f), fontSize = 12.sp) }
-                Column { Text("%.1f h".format(focus / 60.0), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("计划专注", color = Color.White.copy(alpha = .7f), fontSize = 12.sp) }
-                Column { Text(state.tasks.count { it.status == TaskStatus.ACTIVE }.toString(), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("进行中", color = Color.White.copy(alpha = .7f), fontSize = 12.sp) }
+                Column { Text(rows.size.toString(), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold); Text("日程安排", color = Color.White.copy(alpha = .75f), fontSize = 14.sp) }
+                Column { Text("%.1f h".format(focus / 60.0), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold); Text("计划专注", color = Color.White.copy(alpha = .75f), fontSize = 14.sp) }
+                Column { Text(state.tasks.count { it.status == TaskStatus.ACTIVE }.toString(), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold); Text("进行中", color = Color.White.copy(alpha = .75f), fontSize = 14.sp) }
             }
             HorizontalDivider(color = Color.White.copy(alpha = .15f))
             Text("全部保存在手机 · 排程 v${state.schedule.version}", color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.labelSmall)
         } }
-        if (!state.preferences.enabled) item { Panel(color = Color(0xFFE4EFE3)) {
+        if (!state.preferences.enabled) item { Panel(color = Color(0xFFEEEDFF)) {
             Text("从一条群通知开始", fontWeight = FontWeight.Bold)
             Text("添加微信或 QQ 群白名单，再开启系统通知访问。也可以先手动粘贴通知。", style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = openSettings) { Text("设置通知来源 →") }
         } }
         if (pending > 0) item { FilledTonalButton(onClick = openInbox, modifier = Modifier.fillMaxWidth()) { Text("$pending 条识别结果，等待你确认 →") } }
         items(IntelligenceEngine.risks(state, now)) { RiskPanel(it) }
-        item { Panel(color = Color(0xFFE4EFE3)) {
+        item { Panel(color = Color(0xFFEEEDFF)) {
             Text("AI 学习助手", fontWeight = FontWeight.Bold)
             if (!state.preferences.aiEnabled) {
                 Text("在设置中选择 AI 接口后，可生成今日摘要、风险预测和每周复盘。", style = MaterialTheme.typography.bodySmall)
@@ -298,7 +300,7 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
         item { PageHeading("MAKE TIME FOR WHAT MATTERS", "日历，有条不紊。", "先安排临近截止的任务，再考虑优先级。") }
         item { LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(14) { index ->
             val date = day.minusDays(offset.toLong()).plusDays(index.toLong())
-            FilterChip(selected = index == offset, onClick = { select(index) }, label = { Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(if (index == 0) "今天" else date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA), fontSize = 11.sp); Text(date.dayOfMonth.toString(), fontSize = 22.sp, fontWeight = FontWeight.Bold) } })
+            FilterChip(selected = index == offset, onClick = { select(index) }, label = { Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(if (index == 0) "今天" else date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA), fontSize = 13.sp); Text(date.dayOfMonth.toString(), fontSize = 24.sp, fontWeight = FontWeight.Bold) } })
         } } }
         items(state.schedule.risks) { RiskPanel(it) }
         item { Text("${day.monthValue}月${day.dayOfMonth}日 · 排程 v${state.schedule.version}", fontWeight = FontWeight.Bold) }

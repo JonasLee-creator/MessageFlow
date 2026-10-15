@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -49,16 +50,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxSize().background(Paper).safeDrawingPadding().imePadding()) {
+    SystemBars(status = Color(0xFF2A2648), navigation = Color(0xFF1B1830), lightStatus = false, lightNavigation = false)
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF2A2648), Color(0xFF1B1830)))).safeDrawingPadding().imePadding()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 26.dp, end = 26.dp, top = 34.dp, bottom = 86.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(42.dp).background(Teal, RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.AllInclusive, null, tint = Color.White) }
+                Box(Modifier.size(42.dp).background(Brand, RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.AllInclusive, null, tint = Color.White) }
                 Spacer(Modifier.width(12.dp))
-                Column { Text("时序", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("CHRONOFLOW", style = MaterialTheme.typography.labelSmall, color = Muted, letterSpacing = 2.sp) }
+                Column { Text("时序", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White); Text("CHRONOFLOW", style = MaterialTheme.typography.labelSmall, color = Color(0xFFA39DBD), letterSpacing = 2.sp) }
             }
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("把时间，留给重要的事。", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Ink)
-                Text("从纷杂的信息，到清晰的下一步。", color = Muted, style = MaterialTheme.typography.bodyMedium)
+                Text("把时间，留给重要的事。", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("从纷杂的信息，到清晰的下一步。", color = Color(0xFFB7B0C9), style = MaterialTheme.typography.bodyMedium)
             }
             Panel {
                 Text(if (registering) "创建你的时序账号" else "欢迎回到时序", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -84,6 +86,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
                 Text("账号与工作空间数据加密保存在当前手机", style = MaterialTheme.typography.labelSmall, color = Muted)
             }
         }
-        TextButton(onClick = onGuest, enabled = !busy, modifier = Modifier.align(Alignment.BottomEnd).padding(14.dp)) { Text("游客模式"); Spacer(Modifier.width(5.dp)); Icon(Icons.Outlined.ArrowForward, null) }
+        TextButton(onClick = onGuest, enabled = !busy, modifier = Modifier.align(Alignment.BottomEnd).padding(14.dp)) { Text("游客模式", color = Color(0xFFDDD6EE)); Spacer(Modifier.width(5.dp)); Icon(Icons.Outlined.ArrowForward, null, tint = Color(0xFFDDD6EE)) }
     }
 }
