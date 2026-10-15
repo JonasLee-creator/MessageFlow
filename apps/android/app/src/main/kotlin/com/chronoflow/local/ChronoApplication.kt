@@ -12,7 +12,11 @@ class ChronoApplication : Application() {
         super.onCreate()
         Reminders.createChannel(this)
         scope.launch {
-            repository.state.collect { state -> runCatching { Reminders.arm(this@ChronoApplication, state) } }
+            repository.workspace.collect { frame -> runCatching {
+                repository.withCurrentWorkspace(frame.version) { owner, state ->
+                    if (owner == null) Reminders.clear(this@ChronoApplication) else Reminders.arm(this@ChronoApplication, state)
+                }
+            } }
         }
         scope.launch {
             runCatching {

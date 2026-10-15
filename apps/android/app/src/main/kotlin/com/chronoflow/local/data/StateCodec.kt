@@ -16,9 +16,11 @@ object StateCodec {
 
     fun encode(state: LocalState): ByteArray {
         val p = state.preferences
-        return obj("schema" to 2, "preferences" to obj("enabled" to p.enabled, "autoCreate" to p.autoCreate,
+        return obj("schema" to 3, "preferences" to obj("enabled" to p.enabled, "autoCreate" to p.autoCreate,
             "startHour" to p.startHour, "endHour" to p.endHour, "zone" to p.zone, "reminders" to p.reminders,
             "aiEnabled" to p.aiEnabled, "deepSeekApiKey" to p.deepSeekApiKey, "deepSeekModel" to p.deepSeekModel,
+            "aiApiMode" to p.aiApiMode.name, "aiBaseUrl" to p.aiBaseUrl,
+            "officialGatewayUrl" to p.officialGatewayUrl, "officialAccessCode" to p.officialAccessCode,
             "canvasEnabled" to p.canvasEnabled, "canvasBaseUrl" to p.canvasBaseUrl, "canvasAccessToken" to p.canvasAccessToken,
             "groups" to arr(p.groups.map { obj("source" to it.source.name, "name" to it.name) })),
             "notices" to arr(state.notices.map { n -> obj("id" to n.id, "status" to n.status.name, "appliedId" to n.appliedId,
@@ -56,12 +58,15 @@ object StateCodec {
 
     fun decode(bytes: ByteArray): LocalState {
         val root = JSONObject(String(bytes, Charsets.UTF_8))
-        require(root.getInt("schema") in 1..2) { "本地数据版本不受支持" }
+        require(root.getInt("schema") in 1..3) { "本地数据版本不受支持" }
         val p = root.getJSONObject("preferences")
         val preferences = Preferences(p.getBoolean("enabled"), p.rows("groups").map { GroupRule(Source.valueOf(it.getString("source")), it.getString("name")) },
             p.optBoolean("autoCreate"), p.getInt("startHour"), p.getInt("endHour"), p.getString("zone"), p.optBoolean("reminders", true),
             p.optBoolean("aiEnabled"), p.optString("deepSeekApiKey"), p.optString("deepSeekModel", "deepseek-flash"),
-            p.optBoolean("canvasEnabled"), p.optString("canvasBaseUrl"), p.optString("canvasAccessToken"))
+            p.optBoolean("canvasEnabled"), p.optString("canvasBaseUrl"), p.optString("canvasAccessToken"),
+            aiApiMode = if (p.has("aiApiMode")) ApiMode.valueOf(p.getString("aiApiMode")) else ApiMode.USER,
+            aiBaseUrl = p.optString("aiBaseUrl", "https://api.deepseek.com"),
+            officialGatewayUrl = p.optString("officialGatewayUrl"), officialAccessCode = p.optString("officialAccessCode"))
         val notices = root.rows("notices").map { n ->
             val i = n.getJSONObject("input"); val q = n.getJSONObject("proposal")
             val uncertainty = q.optJSONObject("uncertainty")?.let { u ->

@@ -24,7 +24,7 @@ object LocalEngine {
                 status = if (proposal.action == Action.IGNORE) NoticeStatus.IGNORED else NoticeStatus.REVIEW)
         }
         var next = state.copy(notices = (notices + state.notices).take(1000))
-        notices.filter { state.preferences.autoCreate && it.proposal.autoSafe }.forEach { notice -> next = apply(next, notice.id, notice.proposal, now) }
+        notices.filter { state.preferences.autoCreate && it.proposal.autoSafe && !it.proposal.aiGenerated }.forEach { notice -> next = apply(next, notice.id, notice.proposal, now) }
         return next
     }
 

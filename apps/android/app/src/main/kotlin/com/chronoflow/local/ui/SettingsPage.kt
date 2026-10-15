@@ -37,10 +37,12 @@ private fun access(context: android.content.Context): Boolean {
     busy: Boolean,
     lastNotification: String,
     canvasStatus: String,
+    apiStatus: String,
     onSave: (Preferences) -> Unit,
     onConnectCanvas: (String, String) -> Unit,
     onSyncCanvas: () -> Unit,
     onDisconnectCanvas: () -> Unit,
+    onTestApi: (Preferences) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
@@ -50,9 +52,6 @@ private fun access(context: android.content.Context): Boolean {
     var group by rememberSaveable { mutableStateOf("") }
     var start by rememberSaveable(p.startHour) { mutableStateOf(p.startHour.toString()) }
     var end by rememberSaveable(p.endHour) { mutableStateOf(p.endHour.toString()) }
-    var aiEnabled by rememberSaveable(p.aiEnabled) { mutableStateOf(p.aiEnabled) }
-    var apiKey by rememberSaveable(p.deepSeekApiKey) { mutableStateOf(p.deepSeekApiKey) }
-    var aiModel by rememberSaveable(p.deepSeekModel) { mutableStateOf(p.deepSeekModel) }
     var canvasUrl by rememberSaveable(p.canvasBaseUrl) { mutableStateOf(p.canvasBaseUrl) }
     var canvasToken by remember(p.canvasAccessToken) { mutableStateOf(p.canvasAccessToken) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -66,7 +65,7 @@ private fun access(context: android.content.Context): Boolean {
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
     }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { PageHeading("YOUR PHONE. YOUR DATA.", "连接，你的信息。", "计划加密保存在手机；是否启用 DeepSeek 由你决定。") }
+        item { PageHeading("YOUR PHONE. YOUR DATA.", "连接，你的信息。", "计划加密保存在手机，信息来源和 AI 接口由你选择。") }
         item { Panel {
             Text("1 · 选择课程群", style = MaterialTheme.typography.titleMedium)
             Text("按微信、QQ 分别填写群名。需与系统通知显示的群名一致，只处理白名单中的通知。", style = MaterialTheme.typography.bodySmall)
@@ -83,27 +82,7 @@ private fun access(context: android.content.Context): Boolean {
                 TextButton(onClick = { val groups = p.groups - rule; onSave(p.copy(groups = groups, enabled = p.enabled && groups.isNotEmpty())) }, enabled = !busy) { Text("移除") }
             } }
         } }
-        item { Panel {
-            Text("DeepSeek AI 助手", style = MaterialTheme.typography.titleMedium)
-            Text("启用后，白名单通知正文、群名和相关事项会发送到 DeepSeek，用于多事项拆分、上下文追踪、追问、任务拆解与可信度分析。", style = MaterialTheme.typography.bodySmall)
-            Toggle("允许使用 DeepSeek 分析", aiEnabled, enabled = !busy) { aiEnabled = it }
-            OutlinedTextField(apiKey, { apiKey = it.trim() }, label = { Text("DeepSeek API Key") },
-                placeholder = { Text("sk-…") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
-                visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
-            OutlinedTextField(aiModel, { aiModel = it.trim() }, label = { Text("模型") },
-                supportingText = { Text("默认 deepseek-flash；也可填写账户支持的其他模型") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    if (aiEnabled && apiKey.length !in 8..512) message = "请填写有效的 DeepSeek API Key"
-                    else if (aiModel.isBlank() || aiModel.any { it.isWhitespace() }) message = "模型名称无效"
-                    else { onSave(p.copy(aiEnabled = aiEnabled, deepSeekApiKey = apiKey, deepSeekModel = aiModel)); message = null }
-                }, enabled = !busy) { Text("保存 AI 设置") }
-                if (p.deepSeekApiKey.isNotBlank()) TextButton(onClick = {
-                    apiKey = ""; aiEnabled = false; onSave(p.copy(aiEnabled = false, deepSeekApiKey = "")); message = null
-                }, enabled = !busy) { Text("清除密钥") }
-            }
-            Text("API Key 随其他数据使用 Android Keystore 加密保存在本机；请求会产生 DeepSeek API 费用。AI 结果始终先进入「发现」供你核对。", style = MaterialTheme.typography.bodySmall, color = Muted)
-        } }
+        item { ApiSettingsCard(p, busy, apiStatus, onSave, onTestApi) }
         item { Panel {
             Text("Canvas 课程平台", style = MaterialTheme.typography.titleMedium)
             Text("同步已选账号可访问的课程、作业、公告和课程日历。所有新增或变更先进入「发现」，由你确认后才写入日程。", style = MaterialTheme.typography.bodySmall)
@@ -145,8 +124,8 @@ private fun access(context: android.content.Context): Boolean {
                 if (enabled && (!granted || p.groups.isEmpty())) message = "请先添加群名并授予通知访问"
                 else { onSave(p.copy(enabled = enabled)); message = null }
             }
-            Toggle("自动应用明确的新建事项", p.autoCreate, enabled = !busy) { onSave(p.copy(autoCreate = it)) }
-            Text("默认先确认。开启自动应用后，仅自动接受日期、时间和耗时完整且无歧义的新事项；修改、取消及模糊信息仍需确认。", style = MaterialTheme.typography.bodySmall, color = Muted)
+            Toggle("自动应用明确的规则识别事项", p.autoCreate, enabled = !busy) { onSave(p.copy(autoCreate = it)) }
+            Text("默认先确认。开启自动应用后，仅自动接受日期、时间和耗时完整的规则提取新事项；AI 结果、修改、取消及模糊信息始终需要确认。", style = MaterialTheme.typography.bodySmall, color = Muted)
         } }
         item { Panel {
             Text("每天可安排的时间", style = MaterialTheme.typography.titleMedium)

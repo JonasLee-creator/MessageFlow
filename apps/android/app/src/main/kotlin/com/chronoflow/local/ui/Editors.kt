@@ -130,7 +130,7 @@ fun formatTime(time: Instant?, zone: String, short: Boolean = false): String = t
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(group, { group = it }, label = { Text("群名（用于关联已有事项）") })
             OutlinedTextField(content, { content = it }, label = { Text("通知内容") }, minLines = 4, maxLines = 8, placeholder = { Text("实验三明天18:00前提交，预计2小时") })
-            Text(if (aiEnabled) "将发送到 DeepSeek 分析，结果仍需你确认。" else "使用本机规则识别，不会发送到服务器。", style = MaterialTheme.typography.bodySmall)
+            Text(if (aiEnabled) "将发送到所选 AI 接口分析，结果仍需你确认。" else "使用本机规则识别，不会发送到服务器。", style = MaterialTheme.typography.bodySmall)
             if (error) Text("请填写 1–10000 字的通知", color = MaterialTheme.colorScheme.error)
         }
     }, confirmButton = { TextButton(onClick = {
@@ -200,12 +200,12 @@ fun formatTime(time: Instant?, zone: String, short: Boolean = false): String = t
                 Text("本地字段级校验", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                 Text("动作 ${(f.action * 100).toInt()}% · 名称 ${(f.title * 100).toInt()}% · 时间 ${(f.time * 100).toInt()}% · 目标 ${(f.target * 100).toInt()}% · 证据 ${(f.evidence * 100).toInt()}%",
                     style = MaterialTheme.typography.bodySmall)
-                Text("综合 ${(uncertainty.overall * 100).toInt()}%${if (uncertainty.mayAutoCreate) " · 满足自动创建阈值" else " · 需要人工核对"}",
+                Text("综合 ${(uncertainty.overall * 100).toInt()}%${if (uncertainty.mayAutoCreate && !original.aiGenerated) " · 满足规则自动创建阈值" else " · 需要人工核对"}",
                     color = if (uncertainty.mayAutoCreate) Teal else MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.bodySmall)
                 uncertainty.questions.forEach { Text("待确认：$it", style = MaterialTheme.typography.bodySmall) }
             }
-            Text(if (original.aiGenerated) "DeepSeek 辅助识别，确认后才会写入计划。" else "本地规则识别，确认后自动排程。", style = MaterialTheme.typography.bodySmall)
+            Text(if (original.aiGenerated) "AI 辅助识别，确认后才会写入计划。" else "本地规则识别，确认后自动排程。", style = MaterialTheme.typography.bodySmall)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }, confirmButton = { TextButton(onClick = {

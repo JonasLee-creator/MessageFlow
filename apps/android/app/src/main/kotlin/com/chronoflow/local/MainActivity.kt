@@ -5,13 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.chronoflow.local.ui.ChronoScreen
+import com.chronoflow.local.ui.ChronoRoot
 import com.chronoflow.local.ui.ChronoTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { ChronoTheme { ChronoScreen(viewModel()) } }
+        setContent { ChronoTheme { ChronoRoot(viewModel()) } }
     }
 }

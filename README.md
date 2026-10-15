@@ -1,8 +1,10 @@
 # 时序 · ChronoFlow 手机本地版
 
-网页版交互初稿位于 [apps/web](apps/web/README.md)：包含今天、通知核对、任务、日历、复盘和设置，使用浏览器本地演示数据，尚未接入手机同步、Canvas 或 AI。在 `apps/web` 下执行 `node server.mjs`，访问 `http://127.0.0.1:4173/` 即可预览，无需安装前端依赖。
+网页版位于 [apps/web](apps/web/README.md)：包含今天、通知核对、任务、日历、复盘和设置，支持通知录入、任务管理、时间安排与本机数据保存。在 `apps/web` 下执行 `node server.mjs`，访问 `http://127.0.0.1:4173/` 即可使用，无需安装前端依赖。AI 可选择开发者提供的官方接口或用户自备接口，比赛 / 正式使用的切换方式见 [网页版 API 配置](apps/web/API.md)。
 
-当前主线是 **Kotlin + Jetpack Compose 原生 Android 应用**：提取微信、QQ 群系统通知，或通过 Canvas 官方 API 同步课程信息，再使用本地规则或用户主动配置的 DeepSeek API 识别内容，并在手机上确认、保存和安排日程。
+当前主线是 **Kotlin + Jetpack Compose 原生 Android 应用**：提取微信、QQ 群系统通知，或通过 Canvas 官方 API 同步课程信息，再使用本地规则或用户选择的 AI 接口识别内容，并在手机上确认、保存和安排日程。
+
+App 已在源码中加入本机登录 / 注册与游客入口、分账号工作空间，以及官方 / 用户 AI 接口。比赛阶段通过服务端官方接口使用开发者额度，正式阶段由用户接入自己的模型服务。迁移与部署方式见 [Android 账号与接口说明](docs/ANDROID_ACCOUNTS_API.md)；这些新增改动尚未进行 Gradle 编译、APK 打包或真机验收。
 
 **Android Studio 请打开 [apps/android](apps/android)，不是旧的 apps/mobile。**
 

@@ -30,25 +30,37 @@ object Reminders {
         // Inexact alarm: does not request exact-alarm special access.
         alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, maxOf(next.start.toEpochMilli(), now.plusSeconds(2).toEpochMilli()), intent)
     }
+    fun clear(context: Context) {
+        val intent = PendingIntent.getBroadcast(context, 1, Intent(context, ReminderReceiver::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        context.getSystemService(AlarmManager::class.java).cancel(intent)
+        context.getSystemService(NotificationManager::class.java).cancelAll()
+    }
 
     suspend fun deliver(context: Context) {
         val app = context.applicationContext as ChronoApplication
         app.repository.awaitReady()
+        val version = app.repository.workspaceVersion
+        if (app.repository.session.value == null) {
+            app.repository.withCurrentWorkspace(version) { owner, _ -> if (owner == null) clear(context) }
+            return
+        }
         var due = emptyList<ReminderItem>()
-        app.repository.change { state ->
+        app.repository.change(expectedGeneration = version) { state ->
             due = ReminderPlan.pending(state, Instant.now()).filter { it.start <= Instant.now() }
             state.copy(reminded = (state.reminded + due.map { it.key }).toList().takeLast(512).toSet())
         }
-        if (allowed(context)) {
-            val tap = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            due.forEach { item ->
-                val notification = Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_reminder)
-                    .setContentTitle(item.title).setContentText("计划时间到了，打开时序查看安排")
-                    .setContentIntent(tap).setAutoCancel(true).build()
-                context.getSystemService(NotificationManager::class.java).notify(item.key.hashCode(), notification)
+        app.repository.withCurrentWorkspace(version) { owner, current ->
+            if (owner != null && allowed(context)) {
+                val tap = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                due.forEach { item ->
+                    val notification = Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_reminder)
+                        .setContentTitle(item.title).setContentText("计划时间到了，打开时序查看安排")
+                        .setContentIntent(tap).setAutoCancel(true).build()
+                    context.getSystemService(NotificationManager::class.java).notify(item.key.hashCode(), notification)
+                }
             }
+            if (owner != null) arm(context, current) else clear(context)
         }
-        arm(context, app.repository.state.value)
     }
 }
 
@@ -70,7 +82,8 @@ class RestoreRemindersReceiver : BroadcastReceiver() {
             runCatching {
                 app.repository.awaitReady()
                 app.repository.change(replan = true) { it }
-                Reminders.arm(context, app.repository.state.value)
+                val version = app.repository.workspaceVersion
+                app.repository.withCurrentWorkspace(version) { owner, state -> if (owner == null) Reminders.clear(context) else Reminders.arm(context, state) }
             }.onFailure { app.repository.storageError.value = "重新安排提醒失败，请打开应用重试。" }
         } finally { pending.finish() } }
     }

@@ -25,13 +25,16 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun ChronoScreen(vm: AppViewModel) {
-    val state by vm.state.collectAsStateWithLifecycle()
+    val workspace by vm.repository.workspace.collectAsStateWithLifecycle()
+    val state = workspace.state
+    val owner = workspace.session ?: return
     val busy by vm.busy.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
     val diskError by vm.repository.storageError.collectAsStateWithLifecycle()
     val aiError by vm.repository.aiError.collectAsStateWithLifecycle()
     val lastNotification by vm.repository.lastNotification.collectAsStateWithLifecycle()
     val canvasStatus by vm.repository.canvasStatus.collectAsStateWithLifecycle()
+    val apiStatus by vm.repository.apiStatus.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
     var editTask by remember { mutableStateOf<Task?>(null) }
@@ -49,8 +52,8 @@ import kotlinx.coroutines.delay
     Scaffold(
         topBar = { TopAppBar(title = { Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(34.dp).background(Teal, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.AllInclusive, null, tint = Color.White) }
-            Spacer(Modifier.width(10.dp)); Text("时序", fontWeight = FontWeight.Bold); Spacer(Modifier.width(10.dp)); Text("本地日程", style = MaterialTheme.typography.labelMedium, color = Teal)
-        } }, actions = { if (tab != 4) IconButton(onClick = { vm.run { vm.repository.change(replan = true) { it } } }, enabled = !busy) { Icon(Icons.Outlined.Refresh, "重新排程") } }) },
+            Spacer(Modifier.width(10.dp)); Text("时序", fontWeight = FontWeight.Bold); Spacer(Modifier.width(10.dp)); Text(if (owner.isGuest) "游客" else owner.username, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Teal, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        } }, actions = { IconButton(onClick = { vm.run { vm.repository.logout() } }, enabled = !busy) { Icon(Icons.Outlined.Logout, if (owner.isGuest) "返回登录" else "退出登录") }; if (tab != 4) IconButton(onClick = { vm.run { vm.repository.change(replan = true) { it } } }, enabled = !busy) { Icon(Icons.Outlined.Refresh, "重新排程") } }) },
         bottomBar = { NavigationBar { labels.forEachIndexed { index, label -> NavigationBarItem(selected = index == tab, onClick = { tab = index }, icon = {
             if (index == 1 && pending > 0) BadgedBox(badge = { Badge { Text(pending.toString()) } }) { Icon(icons[index], label) }
             else Icon(icons[index], label)
@@ -79,11 +82,12 @@ import kotlinx.coroutines.delay
                     onLock = { vm.run { vm.repository.lock(it.id) } },
                     onOutcome = { block, outcome -> vm.run { vm.repository.recordExecution(block.id, outcome) } },
                     onEditEvent = { editEvent = it; editor = "event" }, onCancelEvent = { vm.run { vm.repository.cancelEvent(it.id) } })
-                4 -> SettingsPage(state.preferences, busy, lastNotification, canvasStatus,
+                4 -> SettingsPage(state.preferences, busy, lastNotification, canvasStatus, apiStatus,
                     onSave = { p -> vm.run { vm.repository.preferences(p) } },
                     onConnectCanvas = { url, token -> vm.run { vm.repository.configureCanvas(url, token) } },
                     onSyncCanvas = { vm.run { vm.repository.syncCanvas() } },
-                    onDisconnectCanvas = { vm.run { vm.repository.disconnectCanvas() } })
+                    onDisconnectCanvas = { vm.run { vm.repository.disconnectCanvas() } },
+                    onTestApi = { p -> vm.run { vm.repository.preferences(p); vm.repository.testApi(p) } })
             }
         }
     }
@@ -178,8 +182,8 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
         item { Panel(color = Color(0xFFE4EFE3)) {
             Text("AI 学习助手", fontWeight = FontWeight.Bold)
             if (!state.preferences.aiEnabled) {
-                Text("在设置中配置 DeepSeek 后，可生成今日摘要、风险预测和每周复盘。", style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = openSettings) { Text("配置 DeepSeek →") }
+                Text("在设置中选择 AI 接口后，可生成今日摘要、风险预测和每周复盘。", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = openSettings) { Text("配置 AI 接口 →") }
             } else {
                 LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(AiReportType.entries) { type -> AssistChip(onClick = { onReport(type) }, enabled = !busy, label = { Text(type.label) }) }
@@ -205,7 +209,7 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
     LazyColumn(contentPadding = pagePadding, verticalArrangement = gaps) {
         item { PageHeading("MESSAGE → PLAN", "发现，值得行动的信息。",
             when {
-                state.preferences.aiEnabled -> "DeepSeek 辅助理解；结果必须由你核对。"
+                state.preferences.aiEnabled -> "AI 辅助理解；结果必须由你核对。"
                 state.preferences.canvasEnabled -> "群聊由本地规则提取；Canvas 从学校官方 API 同步。"
                 else -> "本地规则提取，不联网、不上传群聊内容。"
             }) }

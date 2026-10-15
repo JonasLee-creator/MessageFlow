@@ -36,6 +36,10 @@ data class Preferences(
     val canvasEnabled: Boolean = false,
     val canvasBaseUrl: String = "",
     val canvasAccessToken: String = "",
+    val aiApiMode: ApiMode = ApiMode.USER,
+    val aiBaseUrl: String = "https://api.deepseek.com",
+    val officialGatewayUrl: String = "",
+    val officialAccessCode: String = "",
 )
 data class Incoming(
     val source: Source, val group: String, val content: String, val receivedAt: Instant,
