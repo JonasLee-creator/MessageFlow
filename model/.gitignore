@@ -9,4 +9,5 @@ checkpoints/*.pt
 exports/*.onnx
 exports/*.ort
 adapted/
+evaluation/results/
 

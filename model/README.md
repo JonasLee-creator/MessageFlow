@@ -1,5 +1,7 @@
 # ChronoFlow-DRP 模型工程
 
+日程效果及Baseline对比代码见 [evaluation/README.md](evaluation/README.md)。新增 `scripts/evaluate_predictor.py` 提供可解释预测指标和训练集统计基线；`evaluation/run_evaluation.py` 提供统一仿真回放、八种规划策略、配对统计和报告导出。不会自动训练或执行全量实验。
+
 这个目录保存 ChronoFlow-DRP 的独立研究与训练代码。它与 Android、网页运行时代码隔离：这里产生训练检查点和部署模型，App/网页只加载导出的 ONNX，不直接加载 `.pt`，也不在用户设备上训练全局模型。
 
 本目录不会自动安装依赖或启动训练。当前数据可先执行审计和`--check-only`适配检查；只有两者通过后才应生成训练视图。
