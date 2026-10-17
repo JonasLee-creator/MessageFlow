@@ -13,7 +13,8 @@ from evaluation.metrics import cvar,disruption,feasibility,outcomes,paired_boots
 from evaluation.predictor import Predictor
 from evaluation.prediction_metrics import binary_metrics,duration_metrics,hypervolume3
 from evaluation.replay import replay
-from evaluation.planners import METHODS,plan
+from evaluation.planners import METHODS,plan,build_schedule
+from evaluation.improved_planner import rollout_loss
 
 
 class EvaluationTests(unittest.TestCase):
@@ -116,6 +117,40 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(binary_metrics([],[]),{'n':0})
         self.assertEqual(duration_metrics([],[]),{'n':0})
         self.assertGreater(duration_metrics([(math.log(60),.2)],[60])['crps_minutes'],0)
+
+    def test_v2_preserves_feasibility_and_exposes_candidates(self):
+        config=json.loads((ROOT/'evaluation/config_v2.json').read_text())
+        config['planning_samples']=2
+        row,trace=replay(self.scenario,'drp_full',11,config,Predictor(config))
+        self.assertEqual(row['feasible'],1)
+        self.assertEqual(row['completion_rate'],1)
+        self.assertTrue(any('candidate_count' in e for e in trace['events']))
+        for event in trace['events']:
+            if 'primary_loss' in event:
+                self.assertLessEqual(event['primary_loss'],event['best_primary_loss']+config['primary_loss_tolerance']+1e-9)
+
+    def test_edf_receives_same_continuity_fix(self):
+        from dataclasses import replace
+        task=replace(self.task,splittable=False)
+        blocks,_=plan('edf',[task],{'a':30},{},0,480,[(0,120)],[],self.origin,
+                      self.config,Predictor(self.config),{},{})
+        self.assertEqual(blocks,[Block('a',120,180)])
+
+    def test_v2_nonsplit_reservation_does_not_reuse_progress_after_gap(self):
+        from dataclasses import replace
+        task=replace(self.task,splittable=False)
+        blocks=build_schedule([task],{'a':30},{},0,480,[(0,120)],[],self.origin,self.config,
+            {'a':60},{'a':dict.fromkeys(('morning','afternoon','evening','night'),1.)},
+            'edf',False,{},continuity=True)
+        self.assertEqual(blocks,[Block('a',120,180)])
+
+    def test_v2_rollout_resets_nonsplit_progress_after_gap(self):
+        from dataclasses import replace
+        task=replace(self.task,splittable=False,deadline=150)
+        config=json.loads((ROOT/'evaluation/config_v2.json').read_text())
+        predictions={'a':(math.log(60),.00001,dict.fromkeys(('morning','afternoon','evening','night'),1.))}
+        loss=rollout_loss([Block('a',120,150)],[task],{'a':30},predictions,0,480,self.origin,config,1)
+        self.assertGreaterEqual(loss,1.)
 
 
 if __name__=='__main__':

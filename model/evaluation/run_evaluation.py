@@ -134,7 +134,8 @@ def main():
     except (OSError,subprocess.CalledProcessError):
         commit,status = None,'unknown'
     code_files = list((ROOT/'evaluation').glob('*.py'))
-    manifest = {'protocol':'scheduling-eval-1','python':sys.version,'platform':platform.platform(),
+    manifest = {'protocol':config['protocol_version'],'planner_version':config.get('planner_version',1),
+        'replay_version':'continuity-corrected-2','python':sys.version,'platform':platform.platform(),
         'git_commit':commit,'model_tree_dirty':bool(status),'dataset_sha256':sha(source),
         'checkpoint_sha256':sha(args.checkpoint) if args.checkpoint else None,
         'model_config_sha256':sha(args.model_config),
@@ -169,8 +170,15 @@ def main():
         if row['stress']=='all':
             header += '|'+row['method']+'|'+'|'.join(fmt(row.get(k)) for k in (
                 'weighted_ontime_rate','normalized_restricted_latency','cvar_deadline_loss','disruption_minutes','feasible'))+'|\n'
+    notices=[]
+    if args.limit:
+        notices.append('DEBUG SUBSET: limited scenarios; not a final evaluation.')
+    if not args.checkpoint:
+        notices.append('PRIOR ONLY: no trained checkpoint loaded.')
+    else:
+        notices.append('TRAINED CHECKPOINT LOADED.')
     (args.output/'report.md').write_text('# Scheduling evaluation\n\n'+
-        ('DEBUG / PRIOR ONLY: not a final trained-model result.\n\n' if args.limit or not args.checkpoint else '')+
+        '\n'.join(notices)+'\n\n'+
         header+'\nSee manifest.json for assumptions; comparisons.json uses scenario-cluster bootstrap.\n',encoding='utf-8')
     print(f'Results: {args.output}')
 

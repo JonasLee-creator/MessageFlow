@@ -13,12 +13,13 @@ METHODS = ('edf','priority_edf','deterministic','probabilistic','global_probabil
 
 
 def build_schedule(tasks, progress, completed, now, horizon, fixed, old, origin, config,
-                   durations, probabilities, order, personalized, used):
+                   durations, probabilities, order, personalized, used, *, preserve_old=False,
+                   preference_minutes=1440, continuity=True):
     step = config['slot_minutes']
     freeze = config['freeze_minutes']
     at = lambda m: origin+timedelta(minutes=m)
     # All methods obey the same near-term commitments and fixed-event constraints.
-    locked = [b for b in old if b.end>now and b.start<now+freeze and b.task_id not in completed]
+    locked = [b for b in old if b.end>now and (preserve_old or b.start<now+freeze) and b.task_id not in completed]
     result = list(locked)
     day_load = dict(used)
     for b in locked:
@@ -28,7 +29,12 @@ def build_schedule(tasks, progress, completed, now, horizon, fixed, old, origin,
     remaining = {}
     for task in tasks:
         committed = sum(max(0,b.end-max(now,b.start)) for b in locked if b.task_id==task.id)
-        remaining[task.id] = max(0,durations[task.id]-progress.get(task.id,0)-committed)
+        retained = progress.get(task.id,0)
+        if continuity and not task.splittable:
+            first_locked = min((b.start for b in locked if b.task_id==task.id),default=now)
+            if first_locked>now:
+                retained = 0
+        remaining[task.id] = max(0,durations[task.id]-retained-committed)
     def rank(task):
         deadline = task.deadline if task.deadline is not None else horizon+20160
         if order == 'edf':
@@ -49,7 +55,10 @@ def build_schedule(tasks, progress, completed, now, horizon, fixed, old, origin,
             start_at = max(b.end for b in prior)
         candidates = []
         for start in range(math.ceil(start_at/step)*step,horizon,step):
-            end = start+(step if task.splittable else need)
+            length = need
+            if continuity and not task.splittable and not prior and start>now:
+                length = math.ceil(durations[task.id]/step)*step
+            end = start+(step if task.splittable else length)
             if end>horizon:
                 continue
             if not task.splittable and prior and start != start_at:
@@ -63,7 +72,7 @@ def build_schedule(tasks, progress, completed, now, horizon, fixed, old, origin,
             if any(day_load.get(d,0)+days.count(d)*step>config['daily_capacity_minutes'] for d in set(days)):
                 continue
             p = probabilities[task.id][bucket(at(start))] if personalized else 1.
-            score = start-now + (1-p)*1440 if personalized else start-now
+            score = start-now + (1-p)*preference_minutes if personalized else start-now
             candidates.append((score,start,end))
         for _,start,end in sorted(candidates):
             if need<=0:
@@ -86,6 +95,10 @@ def predicted_loss(plan,tasks,progress,predictions,now,horizon,origin,config,sam
         mu,sigma,probabilities = predictions[task.id]
         # Conditional remaining duration after observed survival/overrun.
         known = progress.get(task.id,0)
+        if not task.splittable:
+            first_start=min((max(now,b.start) for b in plan if b.task_id==task.id and b.end>now),default=horizon)
+            if first_start>now:
+                known=0.
         normal = NormalDist()
         lower = normal.cdf((math.log(max(.001,known))-mu)/sigma) if known else 0.
         u = lower+(1-lower)*uniform('duration',sample,task.id)
@@ -119,6 +132,9 @@ def plan(method,tasks,progress,completed,now,horizon,fixed,old,origin,config,pre
     tasks = [t for t in tasks if t.id not in completed]
     if not tasks:
         return [],{}
+    if method=='drp_full' and config.get('planner_version',1)>=2:
+        from .improved_planner import improved_plan
+        return improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used)
     personal = method in ('personalized','risk_aware','drp_full')
     if method in ('edf','priority_edf'):
         predictions = {t.id:(math.log(t.estimate),config['duration_sigma_prior'],

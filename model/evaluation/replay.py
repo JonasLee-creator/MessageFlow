@@ -22,6 +22,11 @@ def replay(scenario,method,seed,config,predictor):
     last_task,last_end = None,-1
     dirty = True
     for now in range(0,scenario.horizon,step):
+        # Non-splittable work is retained only across uninterrupted attempts.
+        # Clear stale progress BEFORE a planner observes it, not on execution later.
+        for task in scenario.tasks:
+            if not task.splittable and task.id not in completed and (last_task!=task.id or last_end!=now):
+                progress[task.id] = 0.
         known = [t for t in scenario.tasks if t.available<=now]
         new_visible = {t.id for t in known}
         released = new_visible-visible
