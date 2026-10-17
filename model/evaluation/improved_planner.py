@@ -13,7 +13,7 @@ from .metrics import cvar,disruption,feasibility,mean
 from .predictor import bucket,quantile
 
 
-def rollout_loss(blocks,tasks,progress,predictions,now,horizon,origin,config,sample):
+def rollout_loss(blocks,tasks,progress,predictions,now,horizon,origin,config,sample,*,components=False):
     """Same reset semantics as replay, with deadline loss as the primary outcome."""
     step=config['slot_minutes']
     weight=sum(t.priority for t in tasks) or 1
@@ -50,6 +50,9 @@ def rollout_loss(blocks,tasks,progress,predictions,now,horizon,origin,config,sam
             deadline_loss+=task.priority*int(finish is None or finish>task.deadline)
         unfinished+=task.priority*max(0.,total-work)/max(1.,total)
         response+=task.priority*(min(horizon,finish if finish is not None else horizon)-now)/max(1,horizon-now)
+    if components:
+        return {'deadline':deadline_loss/(due_weight or 1),
+                'unfinished':unfinished/weight,'response':response/weight}
     return (deadline_loss/(due_weight or 1)
             +config['unfinished_weight']*unfinished/weight
             +config['response_weight']*response/weight)

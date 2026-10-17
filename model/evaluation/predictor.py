@@ -73,6 +73,9 @@ class Predictor:
     def predict(self, task, origin, now, history, personalized):
         mu,sigma,probabilities = self.base(task,origin,now)
         probabilities = dict(probabilities)
+        if personalized and hasattr(history,'adjust'):
+            mu,probabilities = history.adjust(mu,probabilities,now)
+            return mu,sigma,probabilities
         if personalized:
             for key,(success,total) in history.items():
                 if key == '_duration':

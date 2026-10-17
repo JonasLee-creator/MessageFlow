@@ -128,10 +128,14 @@ def predicted_loss(plan,tasks,progress,predictions,now,horizon,origin,config,sam
     return sum(losses)/max(1,sum(t.priority for t in tasks))
 
 
-def plan(method,tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used):
+def plan(method,tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,*,control=None):
     tasks = [t for t in tasks if t.id not in completed]
     if not tasks:
         return [],{}
+    if method=='drp_full' and config.get('planner_version',1)>=3:
+        from .stable_planner import stable_plan
+        return stable_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,
+                           control if control is not None else {})
     if method=='drp_full' and config.get('planner_version',1)>=2:
         from .improved_planner import improved_plan
         return improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used)

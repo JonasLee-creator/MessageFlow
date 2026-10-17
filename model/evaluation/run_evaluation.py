@@ -91,6 +91,14 @@ def main():
         parser.error('invalid bootstrap_samples/cvar_alpha')
     if not config['methods'] or any(m not in METHODS for m in config['methods']):
         parser.error('unknown/empty methods')
+    if config.get('planner_version',1)>=3:
+        if config['planning_samples']<2 or config['local_max_affected_tasks']<1:
+            parser.error('V3 requires >=2 planning samples and >=1 local affected task')
+        for key in ('online_half_life_minutes','online_prior_strength','online_trust_sessions','online_duration_prior'):
+            if config[key]<=0:
+                parser.error(f'{key} must be positive')
+        if not 0<=config['online_error_forgetting']<1:
+            parser.error('online_error_forgetting must be in [0,1)')
     predictor = Predictor(config,args.checkpoint,args.model_config)
     source = args.dataset/'scenario_instances.jsonl'
     scenarios = list(load_scenarios(source,config['split']))
@@ -135,6 +143,7 @@ def main():
         commit,status = None,'unknown'
     code_files = list((ROOT/'evaluation').glob('*.py'))
     manifest = {'protocol':config['protocol_version'],'planner_version':config.get('planner_version',1),
+        'online_version':config.get('online_version',1),
         'replay_version':'continuity-corrected-2','python':sys.version,'platform':platform.platform(),
         'git_commit':commit,'model_tree_dirty':bool(status),'dataset_sha256':sha(source),
         'checkpoint_sha256':sha(args.checkpoint) if args.checkpoint else None,
