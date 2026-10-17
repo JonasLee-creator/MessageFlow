@@ -18,7 +18,7 @@ def rollout_loss(blocks,tasks,progress,predictions,now,horizon,origin,config,sam
     step=config['slot_minutes']
     weight=sum(t.priority for t in tasks) or 1
     due_weight=sum(t.priority for t in tasks if t.deadline is not None and t.deadline<=horizon)
-    deadline_loss,unfinished,response=0.,0.,0.
+    deadline_loss,unfinished,response,completed_weight=0.,0.,0.,0.
     for task in tasks:
         parts=sorted((b for b in blocks if b.task_id==task.id and b.end>now),key=lambda b:b.start)
         known=progress.get(task.id,0)
@@ -48,11 +48,14 @@ def rollout_loss(blocks,tasks,progress,predictions,now,horizon,origin,config,sam
                 break
         if task.deadline is not None and task.deadline<=horizon:
             deadline_loss+=task.priority*int(finish is None or finish>task.deadline)
+        if finish is not None and finish<=horizon:
+            completed_weight+=task.priority
         unfinished+=task.priority*max(0.,total-work)/max(1.,total)
         response+=task.priority*(min(horizon,finish if finish is not None else horizon)-now)/max(1,horizon-now)
     if components:
         return {'deadline':deadline_loss/(due_weight or 1),
-                'unfinished':unfinished/weight,'response':response/weight}
+                'unfinished':unfinished/weight,'response':response/weight,
+                'completion_loss':1-completed_weight/weight}
     return (deadline_loss/(due_weight or 1)
             +config['unfinished_weight']*unfinished/weight
             +config['response_weight']*response/weight)

@@ -112,7 +112,13 @@ def main():
         parser.error('invalid bootstrap_samples/cvar_alpha')
     if not config['methods'] or any(m not in METHODS for m in config['methods']):
         parser.error('unknown/empty methods')
-    if config.get('planner_version',1)>=3:
+    if config.get('planner_version',1)==4:
+        if config['planning_samples']<2 or not config['repair_scopes'] or any(n<1 for n in config['repair_scopes']):
+            parser.error('integrated planner requires >=2 samples and positive repair scopes')
+        for key in ('guard_mean_tolerance','guard_completion_tolerance','guard_tail_tolerance','guard_response_tolerance','guard_confidence_z'):
+            if config[key]<0:
+                parser.error(f'{key} must be nonnegative')
+    if config.get('online_version',1)>=2:
         if config['planning_samples']<2 or config['local_max_affected_tasks']<1:
             parser.error('V3 requires >=2 planning samples and >=1 local affected task')
         for key in ('online_half_life_minutes','online_prior_strength','online_trust_sessions','online_duration_prior'):
