@@ -38,7 +38,7 @@ def replay(scenario,method,seed,config,predictor):
         released = new_visible-visible
         exhausted = any(t.id not in completed and not any(b.task_id==t.id and b.end>now for b in old) for t in known)
         trigger=dirty or released or exhausted
-        if config.get('planner_version',1)>=3 and method=='drp_full' and not dirty and not released:
+        if config.get('enable_replan_cooldown',config.get('planner_version',1)>=3) and method=='drp_full' and not dirty and not released:
             urgent=any(t.id not in completed and t.deadline is not None and now<t.deadline<=now+config['urgent_deadline_minutes'] for t in known)
             if not urgent and now<control.get('next_review',0):
                 trigger=False

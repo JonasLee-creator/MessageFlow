@@ -138,7 +138,8 @@ def plan(method,tasks,progress,completed,now,horizon,fixed,old,origin,config,pre
                            control if control is not None else {})
     if method=='drp_full' and config.get('planner_version',1)>=2:
         from .improved_planner import improved_plan
-        return improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used)
+        return improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,
+                             control=control)
     personal = method in ('personalized','risk_aware','drp_full')
     if method in ('edf','priority_edf'):
         predictions = {t.id:(math.log(t.estimate),config['duration_sigma_prior'],

@@ -58,8 +58,14 @@ def rollout_loss(blocks,tasks,progress,predictions,now,horizon,origin,config,sam
             +config['response_weight']*response/weight)
 
 
-def improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used):
+def improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,*,control=None):
     from .planners import build_schedule
+    control=control if control is not None else {}
+    local_enabled=config.get('enable_local_repair',False)
+    cooldown_enabled=config.get('enable_replan_cooldown',False)
+    rejection_enabled=config.get('enable_low_gain_rejection',False)
+    controls_enabled=local_enabled or cooldown_enabled or rejection_enabled
+    old_valid=[b for b in old if b.task_id not in completed and b.end>now]
     predictions={t.id:predictor.predict(t,origin,now,history,True) for t in tasks}
     probabilities={tid:values[2] for tid,values in predictions.items()}
     prior={t.id:(math.log(t.estimate),config['duration_sigma_prior'],
@@ -70,21 +76,55 @@ def improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,p
     weight=config['cold_start_model_weight']
     weight=weight+(1-weight)*observations/(observations+8)
     candidates={}
-    def add(name,durations,order='edf',personal=False,preserve=False):
-        blocks=build_schedule(tasks,progress,completed,now,horizon,fixed,old,origin,config,
-            durations,probabilities,order,personal,used,preserve_old=preserve,
-            preference_minutes=config['preference_delay_minutes'],continuity=True)
+    def insert(name,blocks):
         if feasibility(blocks,tasks,fixed,config['daily_capacity_minutes'],lambda m:origin+timedelta(minutes=m)):
             return
-        _,frozen=disruption([b for b in old if b.task_id not in completed],blocks,now,config['freeze_minutes'])
+        _,frozen=disruption(old_valid,blocks,now,config['freeze_minutes'])
         if frozen:
             return
         key=tuple((b.task_id,b.start,b.end) for b in blocks)
         candidates.setdefault(key,(name,blocks))
+    def add(name,durations,order='edf',personal=False,preserve=False):
+        blocks=build_schedule(tasks,progress,completed,now,horizon,fixed,old,origin,config,
+            durations,probabilities,order,personal,used,preserve_old=preserve,
+            preference_minutes=config['preference_delay_minutes'],continuity=True)
+        insert(name,blocks)
+    new_ids={t.id for t in tasks}-set(control.get('known_ids',[]))
+    missing={t.id for t in tasks if not any(b.task_id==t.id for b in old_valid)}
+    affected=(new_ids|missing|set(control.get('affected',[])))-set(completed)
+    if controls_enabled:
+        insert('keep_current',old_valid)
+    if local_enabled:
+        from .stable_planner import changed_tasks
+        priority=sorted((t for t in tasks if t.id in affected),key=lambda t:(
+            t.deadline if t.deadline is not None else horizon+20160,-t.priority,t.id))
+        local_ids={t.id for t in priority[:config['local_max_affected_tasks']]}
+        for q in (.5,.8):
+            retained=[b for b in old_valid if b.task_id not in local_ids or b.start<now+config['freeze_minutes']]
+            durations={}
+            for t in tasks:
+                if t.id in local_ids:
+                    durations[t.id]=max(quantile(*predictions[t.id][:2],q),progress.get(t.id,0)+config['slot_minutes'])
+                else:
+                    committed=sum(max(0,b.end-max(now,b.start)) for b in retained if b.task_id==t.id)
+                    first=min((b.start for b in retained if b.task_id==t.id),default=now)
+                    saved=progress.get(t.id,0) if t.splittable or first<=now else 0.
+                    durations[t.id]=committed+saved
+            blocks=build_schedule(tasks,progress,completed,now,horizon,fixed,retained,origin,config,
+                durations,probabilities,'edf',False,used,preserve_old=True,continuity=True)
+            if changed_tasks(old_valid,blocks,now,config['slot_minutes'])<=local_ids:
+                insert(f'local_p{q}',blocks)
+    urgent=any(t.id in affected and t.deadline is not None and
+        now<t.deadline<=now+config.get('urgent_deadline_minutes',120) for t in tasks)
+    cooldown=cooldown_enabled and now-control.get('last_global',-10**9)<config['global_replan_cooldown_minutes']
+    # New/unscheduled tasks and invalid commitments cannot be stranded by cooling.
+    global_search=not cooldown or bool(missing) or urgent or not candidates
     estimated={t.id:max(t.estimate,progress.get(t.id,0)+config['slot_minutes']) for t in tasks}
-    add('edf_estimate',estimated)
-    add('retain_and_fill',estimated,preserve=True)
-    for q in (.5,.8,.95):
+    if global_search:
+        control['last_global']=now
+        add('edf_estimate',estimated)
+        add('retain_and_fill',estimated,preserve=True)
+    for q in ((.5,.8,.95) if global_search else ()):
         durations={t.id:max(quantile(*predictions[t.id][:2],q),progress.get(t.id,0)+config['slot_minutes']) for t in tasks}
         for order in ('edf','priority_edf'):
             add(f'p{q}-{order}',durations,order)
@@ -102,7 +142,6 @@ def improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,p
             distribution=predictions if (s+.5)/config['planning_samples']<weight else prior
             values.append(rollout_loss(blocks,tasks,progress,distribution,now,horizon,origin,config,s))
         return values
-    old_valid=[b for b in old if b.task_id not in completed and b.end>now]
     old_losses=losses(old_valid)
     scored=[]
     for name,blocks in candidates.values():
@@ -121,9 +160,24 @@ def improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,p
     best_primary=min(item[5] for item in scored)
     admissible=[item for item in scored if item[5]<=best_primary+config['primary_loss_tolerance']]
     score,_,name,blocks,values,primary=min(admissible,key=lambda item:(item[0],item[1],item[2]))
-    return blocks,{'planner_version':2,'candidate':name,'candidate_count':len(scored),
+    rejected=False
+    if rejection_enabled and name!='keep_current' and not missing:
+        previous=next((item for item in admissible if item[2]=='keep_current'),None)
+        if previous is not None and previous[5]-primary<config['minimum_replan_gain']:
+            score,_,name,blocks,values,primary=previous
+            rejected=True
+    if controls_enabled:
+        control['known_ids']=[t.id for t in tasks]
+        control['affected']=[]
+    detail={'planner_version':2,'candidate':name,'candidate_count':len(scored),
         'selection_score':score,'model_weight':weight,'predicted_mean_loss':mean(values),
         'primary_loss':primary,'best_primary_loss':best_primary,'admissible_candidates':len(admissible),
         'predicted_cvar':cvar(values,config['cvar_alpha']),
         'predicted_old_cvar':cvar(old_losses,config['cvar_alpha']),
         'predicted_cvar_reduction':cvar(old_losses,config['cvar_alpha'])-cvar(values,config['cvar_alpha'])}
+    from .stable_planner import changed_tasks
+    detail.update(global_search=int(global_search),cooldown_active=int(cooldown),
+        rejected_low_gain=int(rejected),
+        stage='keep' if name=='keep_current' else 'local' if name.startswith('local_') else 'global',
+        affected_task_count=len(changed_tasks(old_valid,blocks,now,config['slot_minutes'])))
+    return blocks,detail

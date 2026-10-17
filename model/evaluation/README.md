@@ -190,3 +190,45 @@ python evaluation/run_evaluation.py \
 新增诊断输出：`global_searches`、`local_repairs`、`keep_plan_decisions`、`changed_plan_decisions`、`rejected_low_gain_replans`、`affected_tasks_per_decision`、`physical_changed_tasks_per_decision`、`online_sessions`。`replans`依旧表示规划决策次数，包含最终保留旧计划的决策，不等于真正改变计划的次数。
 
 `Movement`原定义保持不变。相邻块编码是否等价，通过实际时间槽占用集合判断，仅供局部范围和新增诊断使用，不会重新定义主扰动指标以美化结果。
+
+## 独立开关和受控消融入口
+
+三个布尔配置项现在同时支持V2和V3：
+
+| JSON配置 | 命令行覆盖 |
+|---|---|
+| enable_local_repair | --local-repair on/off |
+| enable_replan_cooldown | --replan-cooldown on/off |
+| enable_low_gain_rejection | --low-gain-rejection on/off |
+
+V2缺省均为关闭，V3缺省均为开启。关闭开关不会关闭课程、冻结或每日容量约束。V2的局部修复开关增加“保留”和局部补排候选，仍使用原V2评分与主损失保护；V3继续采用自身的分阶段搜索和双风险保护，因此不要把V3关掉开关后的结果直接称为原V2。
+
+`scripts/run_planner_ablations.py` 从同一份V2配置生成受控实验，全部固定 `planner_version=2, online_version=1`。不开启开关的 reference 与原V2决策逻辑一致，单元测试检查了这一点。
+
+默认阶梯：reference → local_only → local_cooldown → combined。
+可额外选择 cooldown_only、rejection_only，区分单独效应与组合交互。
+
+仅生成配置（不会评估，更不会训练）：
+
+```bash
+python scripts/run_planner_ablations.py --output evaluation/results/control-configs-v1
+```
+
+显式运行小规模验证对比，使用新的输出目录：
+
+```bash
+python scripts/run_planner_ablations.py \
+  --checkpoint checkpoints/chronoflow_best.pt \
+  --output evaluation/results/v2-controls-smoke \
+  --limit 10 --seeds 11 --run
+```
+
+脚本串行执行四组，只评估 drp_full，不重复运行EDF等已固定基线。所有组使用相同检查点、评分权重、验证场景和种子；输出 experiment.json、configs/、各组的完整报告以及 comparison.csv、comparison.md。遇到错误或中断即停止，保留已完成结果。
+
+若只想测试单独机制，增加：
+
+```text
+--cases reference local_only cooldown_only rejection_only
+```
+
+这些是规划策略消融，不需要重新训练神经网络。所有评估默认只用10个验证场景，不代表正式结论。

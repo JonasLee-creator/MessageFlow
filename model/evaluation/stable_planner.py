@@ -62,7 +62,7 @@ def stable_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,pre
         key=tuple((b.task_id,b.start,b.end) for b in blocks)
         candidates.setdefault(key,{'name':name,'blocks':blocks,'stage':stage})
     add('keep_current',old,'keep')
-    for q in (.5,.8):
+    for q in ((.5,.8) if config.get('enable_local_repair',True) else ()):
         retained=[b for b in old if b.task_id not in local_ids or b.start<now+config['freeze_minutes']]
         durations={}
         for t in tasks:
@@ -95,11 +95,12 @@ def stable_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,pre
         return row
     local=[score(r) for r in candidates.values()]
     urgent=any(t.id in affected and t.deadline is not None and now<t.deadline<=now+config['urgent_deadline_minutes'] for t in tasks)
-    cooldown=now-control.get('last_global',-10**9)<config['global_replan_cooldown_minutes']
+    cooldown=(config.get('enable_replan_cooldown',True) and
+              now-control.get('last_global',-10**9)<config['global_replan_cooldown_minutes'])
     repair_needed=bool(affected)
     # Escalate when local candidates remain risky; urgent events bypass cooldown.
     local_risk=min((r['deadline_mean'] for r in local),default=1.)
-    full_allowed=('last_global' not in control or not local or urgent or len(new_ids)>config['local_max_affected_tasks'] or
+    full_allowed=(not config.get('enable_replan_cooldown',True) or 'last_global' not in control or not local or urgent or len(new_ids)>config['local_max_affected_tasks'] or
                   (not cooldown and (repair_needed or local_risk>0)))
     if full_allowed:
         control['last_global']=now
@@ -120,7 +121,7 @@ def stable_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,pre
     selected,anchor,n_safe=guarded_choice(rows,config)
     previous=next((r for r in rows if r['stage']=='keep'),None)
     rejected=False
-    if previous is not None and selected is not previous and not missing:
+    if config.get('enable_low_gain_rejection',True) and previous is not None and selected is not previous and not missing:
         gain=previous['primary']-selected['primary']
         # Apply the same protection to accepting a new plan over the old one.
         protects=(previous['deadline_mean']<=anchor['deadline_mean']+config['deadline_mean_tolerance'] and

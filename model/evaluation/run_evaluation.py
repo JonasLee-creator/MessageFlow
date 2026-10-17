@@ -78,8 +78,29 @@ def main():
     parser.add_argument('--seeds',type=int,nargs='+')
     parser.add_argument('--methods',choices=METHODS,nargs='+')
     parser.add_argument('--save-traces',action='store_true')
+    parser.add_argument('--local-repair',choices=('on','off'))
+    parser.add_argument('--replan-cooldown',choices=('on','off'))
+    parser.add_argument('--low-gain-rejection',choices=('on','off'))
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding='utf-8'))
+    for argument,key in (('local_repair','enable_local_repair'),
+                         ('replan_cooldown','enable_replan_cooldown'),
+                         ('low_gain_rejection','enable_low_gain_rejection')):
+        value=getattr(args,argument)
+        if value is not None:
+            config[key]=value=='on'
+    switches=('enable_local_repair','enable_replan_cooldown','enable_low_gain_rejection')
+    if any(k in config and not isinstance(config[k],bool) for k in switches):
+        parser.error('planner switches must be JSON booleans')
+    if any(config.get(k,False) for k in switches):
+        if config.get('planner_version',1)<2:
+            parser.error('planner switches require planner_version 2 or 3')
+        defaults=json.loads((ROOT/'evaluation/config_v3.json').read_text(encoding='utf-8'))
+        for key in ('local_max_affected_tasks','urgent_deadline_minutes',
+                    'global_replan_cooldown_minutes','minimum_replan_gain'):
+            config.setdefault(key,defaults[key])
+        if config['local_max_affected_tasks']<1 or config['global_replan_cooldown_minutes']<0 or config['minimum_replan_gain']<0:
+            parser.error('invalid planner control parameters')
     for key in ('split','seeds','methods'):
         if getattr(args,key) is not None:
             config[key] = getattr(args,key)
