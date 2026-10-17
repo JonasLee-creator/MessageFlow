@@ -258,3 +258,38 @@ python evaluation/run_evaluation.py \
   --split validation --limit 10 --seeds 11 \
   --output evaluation/results/integrated-smoke --save-traces
 ```
+
+## 优化器细节修订：config_integrated_plus.json
+
+新配置保持原统一版权重、采样数、旧在线更新和三组采样保护，仅设置 `optimizer_revision=2`。旧配置仍可运行；本轮只执行人工夹具单元测试，没有读取验证结果调参或启动数据集评估。
+
+修订内容：
+
+1. 候选工时按 `T > 已执行工作量` 的条件分布生成，避免超时后反复只补一个槽；历史工作量不会再次加到总耗时上。
+2. 优先生成保留所有既有预约的补排候选，以及仅裁剪未冻结、可拆任务尾部多余预约的候选。不移动或裁剪正在执行、冻结或不可拆任务。
+3. 执行缓冲只按任务实际允许的未来时间窗口、工作时段、固定课程和剩余容量估计；不把不可工作的夜间概率直接平均进去。
+4. 紧迫度考虑最早可开始时间与条件剩余耗时，避免把尚未允许开始的任务误判为有大量可用时间。
+5. 候选评分预先按任务整理时间块；回归测试确认与未缓存的逐样本计算完全相同。
+6. 存在通过检查、且不产生扰动的候选时，避免继续扩大修复搜索；最终独立复核和V2回退仍保留。
+
+共同正确性检查也已统一：正在执行的块属于冻结承诺；约束审查考虑当天已使用容量、观察窗口、工作时段及未知任务ID；嵌套时间块重叠不能漏检。预测指标对长度不匹配、NaN或非法参数明确报错，不再悄悄丢弃样本；配对统计先对齐“场景+种子”，拒绝重复记录，再进行场景聚类Bootstrap。
+
+这些共同修正应用到所有方法，扰动成本和主要指标的数值定义没有修改。回放版本号更新为 `constraint-audited-3`；旧结果继续保留，但正式对比应在同一版本下重跑参考方法，不拼接不同回放版本的结果。
+
+初步配对检查建议两组各20个场景、同一种子，只运行drp_full：
+
+```bash
+python evaluation/run_evaluation.py \
+  --config evaluation/config_integrated.json \
+  --checkpoint checkpoints/chronoflow_best.pt \
+  --split validation --methods drp_full --limit 20 --seeds 11 \
+  --output evaluation/results/integrated-audit20
+
+python evaluation/run_evaluation.py \
+  --config evaluation/config_integrated_plus.json \
+  --checkpoint checkpoints/chronoflow_best.pt \
+  --split validation --methods drp_full --limit 20 --seeds 11 \
+  --output evaluation/results/integrated-plus-audit20
+```
+
+不能预先保证这些修正会改善所有指标；新候选的实际收益与评分缓存的耗时收益都需后续测量。检查点和原始数据无需重新生成。

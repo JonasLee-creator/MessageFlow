@@ -48,14 +48,8 @@ def stable_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,pre
     local_ids={t.id for t in ordered[:config['local_max_affected_tasks']]}
     candidates={}
     def add(name,blocks,stage):
-        if feasibility(blocks,tasks,fixed,config['daily_capacity_minutes'],at):
-            return
-        future_load=dict(used)
-        for b in blocks:
-            for m in range(max(now,b.start),b.end,step):
-                day=at(m).date().isoformat()
-                future_load[day]=future_load.get(day,0)+step
-        if any(v>config['daily_capacity_minutes'] for v in future_load.values()):
+        if feasibility(blocks,tasks,fixed,config['daily_capacity_minutes'],at,
+                       now=now,used=used,horizon=horizon,working_hours=config['working_hours']):
             return
         if disruption(old,blocks,now,config['freeze_minutes'])[1]:
             return

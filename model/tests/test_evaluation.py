@@ -101,15 +101,15 @@ class EvaluationTests(unittest.TestCase):
         self.assertIn(scenario_split('s001'),('train','validation','test'))
 
     def test_cluster_bootstrap_averages_seeds(self):
-        rows=[{'scenario_id':'s','method':m,'x':v} for m,v in [('edf',1),('edf',3),('drp_full',4),('drp_full',6)]]
+        rows=[{'scenario_id':'s','method':m,'seed':i%2,'x':v} for i,(m,v) in enumerate([('edf',1),('edf',3),('drp_full',4),('drp_full',6)])]
         result=paired_bootstrap(rows,'edf','drp_full','x',50,1)
         self.assertEqual(result['clusters'],1)
         self.assertEqual(result['difference'],3)
         self.assertEqual(result['ci95_low'],3)
 
     def test_tail_bootstrap_has_paired_sign(self):
-        rows=[{'scenario_id':'s','method':'edf','deadline_loss':1.},
-              {'scenario_id':'s','method':'drp_full','deadline_loss':.25}]
+        rows=[{'scenario_id':'s','seed':1,'method':'edf','deadline_loss':1.},
+              {'scenario_id':'s','seed':1,'method':'drp_full','deadline_loss':.25}]
         result=paired_tail_bootstrap(rows,'edf','drp_full',20,1,.9)
         self.assertAlmostEqual(result['difference'],-.75)
 

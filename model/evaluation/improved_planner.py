@@ -13,14 +13,15 @@ from .metrics import cvar,disruption,feasibility,mean
 from .predictor import bucket,quantile
 
 
-def rollout_loss(blocks,tasks,progress,predictions,now,horizon,origin,config,sample,*,components=False):
+def rollout_loss(blocks,tasks,progress,predictions,now,horizon,origin,config,sample,*,components=False,prepared_blocks=None):
     """Same reset semantics as replay, with deadline loss as the primary outcome."""
     step=config['slot_minutes']
     weight=sum(t.priority for t in tasks) or 1
     due_weight=sum(t.priority for t in tasks if t.deadline is not None and t.deadline<=horizon)
     deadline_loss,unfinished,response,completed_weight=0.,0.,0.,0.
     for task in tasks:
-        parts=sorted((b for b in blocks if b.task_id==task.id and b.end>now),key=lambda b:b.start)
+        parts=(prepared_blocks.get(task.id,[]) if prepared_blocks is not None else
+               sorted((b for b in blocks if b.task_id==task.id and b.end>now),key=lambda b:b.start))
         known=progress.get(task.id,0)
         if not task.splittable and (not parts or parts[0].start>now):
             known=0.
@@ -80,7 +81,8 @@ def improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,p
     weight=weight+(1-weight)*observations/(observations+8)
     candidates={}
     def insert(name,blocks):
-        if feasibility(blocks,tasks,fixed,config['daily_capacity_minutes'],lambda m:origin+timedelta(minutes=m)):
+        if feasibility(blocks,tasks,fixed,config['daily_capacity_minutes'],lambda m:origin+timedelta(minutes=m),
+                       now=now,used=used,horizon=horizon,working_hours=config['working_hours']):
             return
         _,frozen=disruption(old_valid,blocks,now,config['freeze_minutes'])
         if frozen:

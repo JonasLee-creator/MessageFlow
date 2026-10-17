@@ -48,7 +48,8 @@ def replay(scenario,method,seed,config,predictor):
             new,detail = plan(method,known,progress,completed,now,scenario.horizon,scenario.fixed,
                              old,scenario.origin,config,predictor,history,used,control=control)
             seconds = time.perf_counter()-started
-            errors = feasibility(new,known,scenario.fixed,config['daily_capacity_minutes'],scenario.at)
+            errors = feasibility(new,known,scenario.fixed,config['daily_capacity_minutes'],scenario.at,
+                now=now,used=used,horizon=scenario.horizon,working_hours=config['working_hours'])
             movement,frozen = disruption(old,new,now,config['freeze_minutes'])
             # Completed work may remove its obsolete commitment without violating a freeze.
             if completed:
@@ -130,6 +131,7 @@ def replay(scenario,method,seed,config,predictor):
         'global_searches':sum(e.get('global_search',0) for e in events),
         'local_repairs':sum(e.get('stage')=='local' for e in events),
         'expanded_repairs':sum(e.get('stage')=='expanded' for e in events),
+        'incremental_repairs':sum(e.get('stage')=='incremental' for e in events),
         'reference_plan_selections':sum(e.get('stage')=='reference' for e in events),
         'verification_fallbacks':sum(e.get('verification_fallback',0) for e in events),
         'keep_plan_decisions':sum(e.get('stage')=='keep' for e in events),

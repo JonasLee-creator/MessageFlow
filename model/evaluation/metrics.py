@@ -23,21 +23,34 @@ def cvar(values, alpha=.9):
     return total / mass
 
 
-def feasibility(blocks, tasks, fixed, capacity, at):
+def feasibility(blocks, tasks, fixed, capacity, at,*,now=None,used=None,horizon=None,working_hours=None):
     errors = []
     ordered = sorted(blocks, key=lambda b: b.start)
     by_id = {t.id: t for t in tasks}
-    day_load = {}
+    day_load = dict(used or {})
+    previous_end=None
     for i, block in enumerate(ordered):
-        task = by_id[block.task_id]
+        task = by_id.get(block.task_id)
+        if task is None:
+            errors.append('unknown_task')
+            continue
         if block.end <= block.start or block.start < max(task.available, task.earliest):
             errors.append('invalid_window')
-        if i and block.start < ordered[i-1].end:
+        if previous_end is not None and block.start < previous_end:
             errors.append('overlap')
+        previous_end=max(block.end,previous_end if previous_end is not None else block.end)
+        if horizon is not None and (block.start<0 or block.end>horizon):
+            errors.append('outside_horizon')
         if any(block.start < end and start < block.end for start, end in fixed):
             errors.append('fixed_conflict')
-        for minute in range(block.start, block.end):
-            day = at(minute).date().isoformat()
+        start=max(now,block.start) if now is not None else block.start
+        outside_hours=False
+        for minute in range(start,block.end):
+            instant=at(minute)
+            if working_hours is not None and not outside_hours and not working_hours[0]<=instant.hour<working_hours[1]:
+                errors.append('outside_working_hours')
+                outside_hours=True
+            day = instant.date().isoformat()
             day_load[day] = day_load.get(day, 0) + 1
     if any(v > capacity for v in day_load.values()):
         errors.append('daily_capacity')
@@ -50,6 +63,7 @@ def feasibility(blocks, tasks, fixed, capacity, at):
 
 def disruption(old, new, now, freeze):
     """Match by task and block ordinal; count shifts AND additions/deletions."""
+    old,new=list(old),list(new)
     def index(blocks):
         result = {}
         for block in sorted(blocks, key=lambda b: b.start):
@@ -57,7 +71,10 @@ def disruption(old, new, now, freeze):
                 result.setdefault(block.task_id, []).append(block)
         return result
     left, right = index(old), index(new)
-    cost, frozen = 0., 0
+    cost=0.
+    # Active commitments are also frozen, although their historical start is
+    # intentionally excluded from the unchanged Movement cost definition.
+    frozen=sum(b.start<now<b.end and b not in new for b in old)
     for tid in left.keys() | right.keys():
         a, b = left.get(tid, []), right.get(tid, [])
         # Preserve exact commitments before ordinal matching. A newly inserted
@@ -101,13 +118,32 @@ def outcomes(tasks, completed, first, progress, actual, horizon):
     }
 
 
+def paired_groups(rows,baseline,method,metric):
+    """Pair exact (scenario, seed) first; only then cluster by scenario."""
+    pairs={}
+    for row in rows:
+        if row['method'] not in (baseline,method) or row.get(metric) is None:
+            continue
+        key=(row['scenario_id'],row['seed'])
+        pair=pairs.setdefault(key,{})
+        if row['method'] in pair:
+            raise ValueError(f'duplicate paired record: {key}, {row["method"]}')
+        pair[row['method']]=row[metric]
+    groups={}
+    for (scenario,_),pair in pairs.items():
+        if baseline in pair and method in pair:
+            group=groups.setdefault(scenario,{baseline:[],method:[]})
+            group[baseline].append(pair[baseline])
+            group[method].append(pair[method])
+    return list(groups.values())
+
+
 def paired_bootstrap(rows, baseline, method, metric, samples, seed):
     # Scenario is the independent cluster; repeated seeds are averaged inside each cluster.
-    groups = {}
-    for row in rows:
-        if row['method'] in (baseline,method) and row.get(metric) is not None:
-            groups.setdefault(row['scenario_id'], {}).setdefault(row['method'], []).append(row[metric])
-    delta = [mean(v[method])-mean(v[baseline]) for v in groups.values() if baseline in v and method in v]
+    if samples<1:
+        raise ValueError('bootstrap samples must be positive')
+    groups=paired_groups(rows,baseline,method,metric)
+    delta = [mean(v[method])-mean(v[baseline]) for v in groups]
     if not delta:
         return {'metric':metric, 'clusters':0}
     rng = random.Random(seed)
@@ -118,11 +154,9 @@ def paired_bootstrap(rows, baseline, method, metric, samples, seed):
 
 
 def paired_tail_bootstrap(rows,baseline,method,samples,seed,alpha):
-    groups = {}
-    for row in rows:
-        if row['method'] in (baseline,method):
-            groups.setdefault(row['scenario_id'],{}).setdefault(row['method'],[]).append(row['deadline_loss'])
-    groups = [v for v in groups.values() if baseline in v and method in v]
+    if samples<1:
+        raise ValueError('bootstrap samples must be positive')
+    groups=paired_groups(rows,baseline,method,'deadline_loss')
     if not groups:
         return {'metric':'cvar_deadline_loss','clusters':0}
     def delta(cluster):

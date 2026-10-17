@@ -6,6 +6,12 @@ from .metrics import mean
 
 
 def binary_metrics(probabilities,labels,bins=10):
+    probabilities,labels=list(probabilities),list(labels)
+    if len(probabilities)!=len(labels) or bins<1:
+        raise ValueError('probabilities/labels must align and bins must be positive')
+    for p,y in zip(probabilities,labels):
+        if y is not None and (y not in (0,1) or not math.isfinite(float(p)) or not 0<=float(p)<=1):
+            raise ValueError('invalid binary probability or label')
     rows = [(max(1e-7,min(1-1e-7,float(p))),int(y)) for p,y in zip(probabilities,labels) if y is not None]
     if not rows:
         return {'n':0}
@@ -49,6 +55,12 @@ def binary_metrics(probabilities,labels,bins=10):
 
 
 def duration_metrics(parameters,targets):
+    parameters,targets=list(parameters),list(targets)
+    if len(parameters)!=len(targets):
+        raise ValueError('duration predictions and targets must align')
+    for (mu,sigma),target in zip(parameters,targets):
+        if target is not None and (not all(math.isfinite(float(v)) for v in (mu,sigma,target)) or sigma<=0 or target<=0):
+            raise ValueError('duration metrics require finite parameters, positive sigma and target')
     rows = [(float(mu),float(sigma),float(t)) for (mu,sigma),t in zip(parameters,targets) if t is not None and t>0]
     if not rows:
         return {'n':0}

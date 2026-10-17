@@ -171,7 +171,8 @@ def main():
     code_files = list((ROOT/'evaluation').glob('*.py'))
     manifest = {'protocol':config['protocol_version'],'planner_version':config.get('planner_version',1),
         'online_version':config.get('online_version',1),
-        'replay_version':'continuity-corrected-2','python':sys.version,'platform':platform.platform(),
+        'optimizer_revision':config.get('optimizer_revision',1),
+        'replay_version':'constraint-audited-3','python':sys.version,'platform':platform.platform(),
         'git_commit':commit,'model_tree_dirty':bool(status),'dataset_sha256':sha(source),
         'checkpoint_sha256':sha(args.checkpoint) if args.checkpoint else None,
         'model_config_sha256':sha(args.model_config),
