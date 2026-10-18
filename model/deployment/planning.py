@@ -15,6 +15,27 @@ CATEGORIES = {'AUTO':'其他','EXPERIMENT':'实验','REPORT':'报告','PROGRAMMI
     'REVIEW':'复习','MEMORIZATION':'背诵','READING':'阅读','EXAM_PREPARATION':'考试准备','OTHER':'其他'}
 
 
+def normalize_confirmed_blocks(old, confirmed, now, locks, step):
+    """Remove excess legacy reservations before treating them as commitments.
+
+    User locks and active blocks remain exact. Never silently trim those: a
+    conflicting manual reservation requires the user to adjust it first.
+    """
+    limits = {tid: math.ceil(value / step) * step for tid, value in confirmed.items()}
+    protected = [b for b in old if (b.task_id, b.start, b.end) in locks or b.start <= now]
+    result = list(protected)
+    for b in protected:
+        limits[b.task_id] -= b.end - max(now, b.start)
+    if any(value < 0 for value in limits.values()):
+        raise ValueError('锁定或正在执行的时段超过剩余工时，请先核对剩余耗时与锁定时段')
+    for b in sorted((b for b in old if b not in protected), key=lambda b: (b.start, b.task_id)):
+        take = min(b.end - b.start, limits[b.task_id])
+        if take > 0:
+            result.append(Block(b.task_id, b.start, b.start + take))
+            limits[b.task_id] -= take
+    return sorted(result, key=lambda b: b.start)
+
+
 def timestamp(value):
     if not isinstance(value,str) or len(value)>64:
         raise ValueError('invalid timestamp')
@@ -62,10 +83,13 @@ def make_plan(payload, predictor_factory, now=None):
     if start!=int(start) or end!=int(end) or end<=start or capacity%30:
         raise ValueError('invalid available hours/capacity')
     config.update(working_hours=[int(start),int(end)],daily_capacity_minutes=int(capacity))
+    workload_policy = settings.get('workloadPolicy', 'model')
+    if workload_policy not in ('model', 'confirmed'):
+        raise ValueError('invalid workload policy')
     horizon = current+14*1440
     minute = lambda value: round((timestamp(value).astimezone(zone)-origin).total_seconds()/60)
     at = lambda value: origin+timedelta(minutes=value)
-    tasks, progress, ids = [], {}, set()
+    tasks, progress, ids, confirmed = [], {}, set(), {}
     for row in rows(payload,'tasks',30):
         tid = text(row.get('id'),100)
         if tid in ids:
@@ -93,6 +117,7 @@ def make_plan(payload, predictor_factory, now=None):
             int(difficulty),int(priority),release,release,earliest,
             minute(row['deadline']) if row.get('deadline') else None,float(estimate),row.get('splittable',True)))
         progress[tid] = max(0.,estimate-remaining)
+        confirmed[tid] = remaining
     active_ids = {t.id for t in tasks}
     fixed = []
     for row in rows(payload,'events',256):
@@ -117,6 +142,9 @@ def make_plan(payload, predictor_factory, now=None):
         if row.get('locked') is True:
             locked.append((block.task_id,a,b))
     config['_locked_blocks'] = locked
+    if workload_policy == 'confirmed':
+        config['_confirmed_remaining_minutes'] = confirmed
+        old = normalize_confirmed_blocks(old, confirmed, current, set(locked), config['slot_minutes'])
     history, used = {}, {}
     predictor = predictor_factory(config)
     residuals=[]
@@ -176,6 +204,11 @@ def make_plan(payload, predictor_factory, now=None):
         now=current,used=used,horizon=horizon,working_hours=config['working_hours'])
     if errors or any(Block(t,a,b) not in blocks for t,a,b in locked):
         raise ValueError('existing commitments conflict with available time; adjust fixed/locked blocks first')
+    if workload_policy == 'confirmed':
+        for task in tasks:
+            allocated = sum(b.end-max(current,b.start) for b in blocks if b.task_id==task.id)
+            if allocated > math.ceil(confirmed[task.id]/config['slot_minutes'])*config['slot_minutes']:
+                raise ValueError('模型计划超出已确认的剩余工时，原计划保留')
     predictions, risks = [], []
     for task in tasks:
         mu,sigma,probabilities = predictor.predict(task,origin,current,history,True)

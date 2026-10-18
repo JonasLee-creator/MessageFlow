@@ -28,6 +28,7 @@ class EmbeddedModelTest {
         assertTrue(forecast.p50Minutes > 0)
         assertTrue(forecast.p50Minutes <= forecast.p80Minutes && forecast.p80Minutes <= forecast.p95Minutes)
         assertTrue(plan.blocks.isNotEmpty())
+        assertEquals(60L, plan.blocks.sumOf { java.time.Duration.between(it.start, it.end).toMinutes() })
         assertTrue(plan.blocks.none { LocalScheduler.overlaps(it.start, it.end, start, end) })
         assertTrue(plan.blocks.all { it.taskId == task.id })
     }

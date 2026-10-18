@@ -188,7 +188,7 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
             state.schedule.modelPredictions.take(4).forEach { f ->
                 Text("${state.tasks.firstOrNull { it.id == f.taskId }?.title ?: "任务"}：P50 ${f.p50Minutes} / P80 ${f.p80Minutes} / P95 ${f.p95Minutes} 分钟", style = MaterialTheme.typography.bodySmall)
             }
-            Text("耗时分位数是预测，不能保证按期完成。任务或课表变化后请重新生成智能计划。", style = MaterialTheme.typography.labelSmall, color = Muted)
+            Text("按你确认的剩余工时排程，不足30分钟向上取整。模型耗时预测供参考；如需增加工时，请编辑任务后确认。", style = MaterialTheme.typography.labelSmall, color = Muted)
         } }
         item { Panel(color = Ink) {
             Text("你的今日节奏", color = Color(0xFFD4CEFF), style = MaterialTheme.typography.titleSmall)

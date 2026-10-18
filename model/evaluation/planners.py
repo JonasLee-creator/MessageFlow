@@ -29,6 +29,10 @@ def build_schedule(tasks, progress, completed, now, horizon, fixed, old, origin,
             day = at(m).date().isoformat()
             day_load[day] = day_load.get(day,0)+step
     remaining = {}
+    # Product clients may explicitly confirm remaining work. In that mode the
+    # model ranks time slots and risk, but may not silently add more workload.
+    # Replay/evaluation leaves this absent and retains its original semantics.
+    confirmed = config.get('_confirmed_remaining_minutes', {})
     for task in tasks:
         committed = sum(max(0,b.end-max(now,b.start)) for b in locked if b.task_id==task.id)
         retained = progress.get(task.id,0)
@@ -36,7 +40,8 @@ def build_schedule(tasks, progress, completed, now, horizon, fixed, old, origin,
             first_locked = min((b.start for b in locked if b.task_id==task.id),default=now)
             if first_locked>now:
                 retained = 0
-        remaining[task.id] = max(0,durations[task.id]-retained-committed)
+        remaining[task.id] = max(0, confirmed[task.id]-committed if task.id in confirmed
+                                 else durations[task.id]-retained-committed)
     def rank(task):
         deadline = task.deadline if task.deadline is not None else horizon+20160
         if order == 'edf':
@@ -59,9 +64,11 @@ def build_schedule(tasks, progress, completed, now, horizon, fixed, old, origin,
         for start in range(math.ceil(start_at/step)*step,horizon,step):
             length = need
             if continuity and not task.splittable and not prior and start>now:
-                length = math.ceil(durations[task.id]/step)*step
+                length = math.ceil(confirmed.get(task.id,durations[task.id])/step)*step
             end = start+(step if task.splittable else length)
             if end>horizon:
+                continue
+            if task.id in confirmed and task.deadline is not None and end>task.deadline:
                 continue
             if not task.splittable and prior and start != start_at:
                 continue

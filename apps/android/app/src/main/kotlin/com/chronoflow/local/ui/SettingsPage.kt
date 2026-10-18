@@ -159,6 +159,6 @@ private fun access(context: android.content.Context): Boolean {
             Text("使用系统普通定时提醒，省电模式或厂商后台限制可能造成延迟，不作为精确闹钟。", style = MaterialTheme.typography.bodySmall, color = Muted)
         } }
         message?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { Text("时序 0.5.0\n微信/QQ仅能提取系统实际展示的通知文字；Canvas 通过官方 API 同步。\n原始通知最多保留1000条，卸载或清除应用数据会删除本地计划与密钥。", style = MaterialTheme.typography.bodySmall, color = Muted, modifier = Modifier.padding(bottom = 20.dp)) }
+        item { Text("时序 0.5.1\n微信/QQ仅能提取系统实际展示的通知文字；Canvas 通过官方 API 同步。\n原始通知最多保留1000条，卸载或清除应用数据会删除本地计划与密钥。", style = MaterialTheme.typography.bodySmall, color = Muted, modifier = Modifier.padding(bottom = 20.dp)) }
     }
 }

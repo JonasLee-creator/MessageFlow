@@ -18,7 +18,8 @@ class ModelPlannerClient(private val context: Context) {
         val active = state.tasks.filter { it.status == TaskStatus.ACTIVE && it.remaining > 0 }
         require(active.size <= 30) { "一次最多规划30项活动任务，请先归档已结束事项" }
         val body = obj("consent" to true, "timezone" to p.zone,
-            "settings" to obj("startHour" to p.startHour, "endHour" to p.endHour, "dailyCapacityMinutes" to 360),
+            "settings" to obj("startHour" to p.startHour, "endHour" to p.endHour, "dailyCapacityMinutes" to 360,
+                "workloadPolicy" to "confirmed"),
             "tasks" to arr(active.map { t -> obj("id" to t.id,"title" to t.title,"category" to PersonalTimeModel.resolvedCategory(t).name,
                 "course" to t.group.ifBlank { "unknown" },"difficulty" to t.difficulty,"priority" to t.priority,
                 "minutes" to t.minutes,"remaining" to t.remaining,"releasedAt" to (t.releasedAt
@@ -46,6 +47,12 @@ class ModelPlannerClient(private val context: Context) {
         require(blocks.size <= 512 && blocks.all { b -> b.end > b.start && active.any { it.id == b.taskId } &&
             state.events.none { LocalScheduler.overlaps(b.start,b.end,it.start,it.end) } }) { "模型返回无效或冲突的时间块" }
         require(blocks.sortedBy { it.start }.zipWithNext().none { (a,b) -> a.end > b.start }) { "模型时间块互相重叠" }
+        active.forEach { task ->
+            val allocatedSeconds = blocks.filter { it.taskId == task.id }
+                .sumOf { java.time.Duration.between(maxOf(it.start, from), it.end).seconds }
+            val confirmedSeconds = ((task.remaining + 29) / 30) * 30L * 60
+            require(allocatedSeconds <= confirmedSeconds) { "模型为「${task.title}」安排的时间超过剩余工时" }
+        }
         val required = state.schedule.blocks.filter { b -> b.end > from && active.any { it.id == b.taskId } && (b.locked || b.start <= from) }
         require(required.all { a -> blocks.any { it.taskId == a.taskId && it.start == a.start && it.end == a.end } }) { "模型修改了锁定或正在执行的时间块" }
         val forecasts = result.getJSONArray("predictions").let { a -> (0 until a.length()).map { i ->
