@@ -293,3 +293,47 @@ python evaluation/run_evaluation.py \
 ```
 
 不能预先保证这些修正会改善所有指标；新候选的实际收益与评分缓存的耗时收益都需后续测量。检查点和原始数据无需重新生成。
+
+## V5：简单候选与复杂度自适应选择（实验入口）
+
+`config_adaptive.json` 使用 `planner_version=5`，原版 `config_integrated.json` 保持不变，**不采用已出现退步的plus修订**。不改变预测网络、训练检查点、在线更新或baseline算法。
+
+候选包括原EDF、Priority EDF、确定性规划、两个无偏好延迟的P80缓冲候选及可行旧计划。全部候选遵守同一固定安排、工作时间、每日容量、正在执行及冻结承诺。缓冲候选使用DRP已经获得的预测，不获得额外真实标签。
+
+路由仅使用当前已知任务和历史反馈：截止前P80预测需求与可用容量之比、单任务可执行窗口的容量余量、可用时段执行概率及其波动。每日容量不会被贪心地预分给上午，最早可开始时间和其他任务的冻结占位都会限制个体窗口。这只是容量筛查，不是可调度性证明，也不能看到未来任务、真实耗时或模拟执行概率。
+
+- 宽松状态：简单候选在筛选样本上满足预设绝对风险上限后，按预测等待成本加扰动成本选择；小收益保留旧计划。另组样本复核通过后可跳过原版完整搜索。
+- 高压状态或低压复核失败：计算原版Integrated参考，仅允许通过配对完成率/截止损失/尾部风险/等待保护的简单候选参与竞争；最终复核失败回退原版。若原版也无法排全任务，保持原版行为，不伪造完整覆盖。
+- 原版内部采样编号为0至3N-1，自适应候选筛选使用3N至4N-1，最终复核使用4N至5N-1。复核失败不在该组样本上再选另一个简单候选。
+
+新增汇总诊断：`adaptive_low_complexity_decisions`、`adaptive_complex_reference_calls`、`adaptive_simple_selections`、`adaptive_verification_fallbacks`。事件轨迹另含具体复杂度特征与候选名称。高压场景额外生成和审查候选可能更慢，不能预先宣称整体加速；预测样本保护不等于真实整段执行收益保证。
+
+### 仅在原仿真验证集确定门槛
+
+```bash
+python scripts/validate_adaptive_planner.py \
+  --checkpoint checkpoints/chronoflow_best.pt \
+  --limit 20 --seeds 11 --run \
+  --output evaluation/results/adaptive-validation20
+
+cat evaluation/results/adaptive-validation20/comparison.md
+cat evaluation/results/adaptive-validation20/selection.json
+```
+
+脚本只读取 `dataset/scenario_instances.jsonl` 的validation划分，不提供真实数据或test入口，且拒绝真实回放数据替换。固定比较三组：原版、保守门槛（负荷≤0.25、余量≥240分钟）、均衡门槛（负荷≤0.40、余量≥180分钟）。其他权重、检查点、场景和种子相同；每组仅运行drp_full，因此20场景共60次回放。去掉 `--run` 仅生成配置，`--limit 0` 使用完整原验证集。所有目录必须新建。
+
+所有组完成后检查场景与种子精确配对。候选只有在验证集聚合WOTCR不降低、CVaR不升高、等待不增加且约束满足率100%时才能入选；否则输出原版。合格方案按完成率、CVaR、等待、扰动依次排序，完全相同则优先原版。生成 `frozen_config.json`、对比表、选择记录及数据/检查点哈希。这个规则是描述性验证集选择，不是显著性证明；小子集结果只能用于初筛。
+
+在同一原验证集上扩大到50或完整规模时，创建新输出目录，不能把多次调参结果当成独立测试证据。冻结后对新收集、未用于开发的数据测试：
+
+```bash
+python evaluation/run_evaluation.py \
+  --dataset real_data/converted-new-independent \
+  --config evaluation/results/adaptive-validation20/frozen_config.json \
+  --checkpoint checkpoints/chronoflow_best.pt \
+  --split all --seeds 11 \
+  --methods edf priority_edf deterministic probabilistic global_probability personalized risk_aware drp_full \
+  --output evaluation/results/adaptive-new-independent
+```
+
+不要再用已经看过结果的20人真实数据选择门槛。新数据若仍为已完成子集且执行概率为假设值，仍须如实说明其选择偏差和回放性质。不得承诺V5所有指标最优，也无需重新训练`.pt`。

@@ -132,6 +132,10 @@ def plan(method,tasks,progress,completed,now,horizon,fixed,old,origin,config,pre
     tasks = [t for t in tasks if t.id not in completed]
     if not tasks:
         return [],{}
+    if method=='drp_full' and config.get('planner_version',1)==5:
+        from .adaptive_planner import adaptive_plan
+        return adaptive_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,
+                             control if control is not None else {})
     if method=='drp_full' and config.get('planner_version',1)==4:
         from .integrated_planner import integrated_plan
         return integrated_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,
