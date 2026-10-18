@@ -64,7 +64,8 @@ def load_scenarios(path: Path, split: str):
             raw = json.loads(line)
             if split != 'all' and scenario_split(raw['scenario_id']) != split:
                 continue
-            origin = min(datetime.fromisoformat(t['released_at']) for t in raw['tasks'])
+            origin = (datetime.fromisoformat(raw['observation_start']) if raw.get('observation_start')
+                      else min(datetime.fromisoformat(t['released_at']) for t in raw['tasks']))
             def minute(value):
                 return round((datetime.fromisoformat(value) - origin).total_seconds() / 60)
             tasks, truth = [], {}
@@ -82,4 +83,5 @@ def load_scenarios(path: Path, split: str):
             # Missing known_at: all fixed events are explicitly treated as known initially.
             fixed = [(minute(f['start']), minute(f['end'])) for f in raw['fixed_intervals']]
             yield Scenario(raw['scenario_id'], raw['stress_type'], origin,
-                           int(raw['horizon_days']) * 1440, tasks, fixed, truth)
+                           int(raw['horizon_minutes']) if 'horizon_minutes' in raw else int(raw['horizon_days']) * 1440,
+                           tasks, fixed, truth)

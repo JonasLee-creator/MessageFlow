@@ -194,6 +194,13 @@ def main():
             ,'double_skip adds a public-clock-independent simulator shock at relative minutes 120 and 150.'
             ,'predicted_cvar_reduction compares forecasts, not realized recovery benefit or causal improvement.'
         ]}
+    conversion_path = args.dataset/'conversion_report.json'
+    if conversion_path.exists():
+        conversion = json.loads(conversion_path.read_text(encoding='utf-8'))
+        manifest['real_data_conversion'] = conversion
+        manifest['real_data_conversion_sha256'] = sha(conversion_path)
+        if config['split'] == 'all':
+            manifest['split_rule'] = 'All supplied external observation windows; no synthetic hash split.'
     write_json(args.output/'manifest.json',manifest)
     write_json(args.output/'metric_directions.json',{
         'weighted_ontime_rate':'higher','completion_rate':'higher','feasible':'higher',
@@ -208,6 +215,10 @@ def main():
             header += '|'+row['method']+'|'+'|'.join(fmt(row.get(k)) for k in (
                 'weighted_ontime_rate','normalized_restricted_latency','cvar_deadline_loss','disruption_minutes','feasible'))+'|\n'
     notices=[]
+    if any(s.stress=='real_replay' for s in scenarios):
+        notices.append('REAL-DATA-DRIVEN SIMULATION: measured task durations, assumed execution probabilities; not a real-user trial.')
+        if conversion_path.exists() and conversion.get('excluded_from_replay'):
+            notices.append('COMPLETED-TASK SUBSET ONLY: incomplete/cancelled or unknown-duration tasks excluded; selection bias applies.')
     if args.limit:
         notices.append('DEBUG SUBSET: limited scenarios; not a final evaluation.')
     if not args.checkpoint:
