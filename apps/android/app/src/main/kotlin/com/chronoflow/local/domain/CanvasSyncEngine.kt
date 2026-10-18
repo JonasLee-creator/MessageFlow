@@ -14,6 +14,7 @@ data class CanvasItem(
     val startAt: Instant? = null,
     val endAt: Instant? = null,
     val htmlUrl: String = "",
+    val publishedAt: Instant? = null,
     val updatedAt: Instant? = null,
 )
 
@@ -35,7 +36,7 @@ object CanvasSyncEngine {
                 source = Source.CANVAS,
                 group = item.courseName.take(100).ifBlank { "Canvas 课程" },
                 content = content(item).take(10000),
-                receivedAt = item.updatedAt ?: now,
+                receivedAt = if (previous == null) item.publishedAt ?: item.updatedAt ?: now else item.updatedAt ?: now,
                 sender = "Canvas",
                 sourceKey = sourceKey,
             )

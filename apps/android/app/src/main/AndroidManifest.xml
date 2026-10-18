@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Network access is used for user-enabled model services, the official gateway, and Canvas. -->
+    <!-- Network is only used by optional LLM connections and Canvas. Scheduling runs locally. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <application android:name=".ChronoApplication" android:label="时序 · 本地日程" android:icon="@drawable/ic_launcher" android:allowBackup="false" android:theme="@style/AppTheme" android:supportsRtl="true">
+    <application android:name=".ChronoApplication" android:label="时序 · 智能规划" android:icon="@drawable/ic_launcher" android:allowBackup="false" android:theme="@style/AppTheme" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>

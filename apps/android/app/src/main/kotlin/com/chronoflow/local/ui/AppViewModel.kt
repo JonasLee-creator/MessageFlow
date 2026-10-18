@@ -15,7 +15,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val busy = mutableBusy.asStateFlow()
     val error = MutableStateFlow<String?>(null)
     init {
-        run { repository.awaitReady(); repository.change(replan = true) { it } }
+        run { repository.awaitReady(); if (repository.state.value.schedule.engine != "chronoflow-local") repository.change(replan = true) { it } }
     }
     fun run(action: suspend () -> Unit) {
         if (mutableBusy.value) return

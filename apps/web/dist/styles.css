@@ -96,3 +96,7 @@ h3{font-size:16px}
 .topbar{height:68px}
 @media(max-width:1000px){h1{font-size:32px}}
 @media(max-width:720px){h1{font-size:28px}.field input,.field select,.field textarea{font-size:16px}}
+.model-hero{margin-bottom:22px;background:linear-gradient(125deg,#efedff,#faf9ff);border:1px solid #e0dcff}
+.model-hero h2{font-size:24px;line-height:1.4;margin:8px 0}
+.model-hero>.btn{margin:10px 8px 12px 0}
+.model-hero .settings-row{gap:18px;flex-wrap:wrap}

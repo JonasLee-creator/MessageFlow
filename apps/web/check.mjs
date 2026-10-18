@@ -10,6 +10,8 @@ const ctx=vm.createContext({Date:Clock,Intl,crypto:{randomUUID},ChronoApi:{setSc
 vm.runInContext(source,ctx);
 function run(code){return vm.runInContext(code,ctx);}
 assert.equal(run('state.tasks.length + state.events.length + state.notices.length + state.blocks.length'),0,'New workspace must start empty');
+assert.ok(run("canvasPanel().includes('canvas-form')"));
+assert.ok(!source.includes('ChronoPlanner') && !source.includes('runModelPlan'), 'Web must not invoke the trained planner');
 run("state.tasks.push({id:'guest-task',title:'游客任务'});save();session={kind:'member',userId:'account-a',username:'甲'};loadWorkspace();");
 assert.equal(run('state.tasks.length'),0,'Members must not inherit guest records');
 run("state.tasks.push({id:'member-task',title:'账号甲的任务'});save();session={kind:'member',userId:'account-b',username:'乙'};loadWorkspace();");

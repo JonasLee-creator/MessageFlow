@@ -40,6 +40,7 @@ data class Preferences(
     val aiBaseUrl: String = "https://api.deepseek.com",
     val officialGatewayUrl: String = "",
     val officialAccessCode: String = "",
+    val localModelEnabled: Boolean = true,
 )
 data class Incoming(
     val source: Source, val group: String, val content: String, val receivedAt: Instant,
@@ -75,6 +76,8 @@ data class Task(
     val completedAt: Instant? = null, val deadlineChanges: Int = 0,
     val category: TaskCategory = TaskCategory.AUTO, val difficulty: Int = 3,
     val originalEstimateMinutes: Int = minutes,
+    /** When the task first became actionable: notification receipt, Canvas publication, or manual creation. */
+    val releasedAt: Instant? = null,
 )
 data class SubTask(val id: String = newId(), val title: String, val done: Boolean = false)
 data class FixedEvent(
@@ -88,7 +91,9 @@ data class ExecutionRecord(
     val outcome: ExecutionOutcome, val recordedAt: Instant = Instant.now(),
 )
 data class Risk(val title: String, val message: String, val missingMinutes: Int = 0)
-data class Schedule(val version: Int = 0, val blocks: List<Block> = emptyList(), val risks: List<Risk> = emptyList(), val generatedAt: Instant? = null)
+data class TaskForecast(val taskId: String, val p50Minutes: Int, val p80Minutes: Int, val p95Minutes: Int)
+data class Schedule(val version: Int = 0, val blocks: List<Block> = emptyList(), val risks: List<Risk> = emptyList(), val generatedAt: Instant? = null,
+    val engine: String = "basic", val modelPredictions: List<TaskForecast> = emptyList())
 data class AiReport(
     val id: String = newId(), val type: AiReportType, val title: String,
     val summary: String, val bullets: List<String>, val generatedAt: Instant = Instant.now(),

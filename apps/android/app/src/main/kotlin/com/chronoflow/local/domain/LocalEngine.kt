@@ -40,7 +40,8 @@ object LocalEngine {
                 validateTitle(proposal.title)
                 val minutes = proposal.minutes ?: 60
                 require(minutes in 1..20160) { "耗时必须在 1–20160 分钟之间" }
-                val task = Task(title = proposal.title, group = notice.input.group, source = notice.input.source, deadline = proposal.deadline, minutes = minutes, sourceIds = listOf(notice.id))
+                val task = Task(title = proposal.title, group = notice.input.group, source = notice.input.source,
+                    deadline = proposal.deadline, minutes = minutes, sourceIds = listOf(notice.id), releasedAt = notice.input.receivedAt)
                     .copy(subTasks = proposal.subTasks.map { SubTask(title = it) })
                 tasks = tasks + task; appliedId = task.id
             }
@@ -85,7 +86,9 @@ object LocalEngine {
         validateTitle(task.title)
         require(task.minutes in 1..20160 && task.remaining in 0..20160 && task.priority in 1..10 &&
             task.difficulty in 1..5 && task.originalEstimateMinutes in 1..20160) { "请检查耗时、难度和优先级" }
-        val next = state.copy(tasks = state.tasks.filterNot { it.id == task.id } + task)
+        val previous = state.tasks.firstOrNull { it.id == task.id }
+        val saved = task.copy(releasedAt = task.releasedAt ?: previous?.releasedAt ?: now)
+        val next = state.copy(tasks = state.tasks.filterNot { it.id == task.id } + saved)
         return next.copy(schedule = LocalScheduler.plan(next, now))
     }
 

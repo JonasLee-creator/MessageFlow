@@ -35,6 +35,7 @@ import kotlinx.coroutines.delay
     val lastNotification by vm.repository.lastNotification.collectAsStateWithLifecycle()
     val canvasStatus by vm.repository.canvasStatus.collectAsStateWithLifecycle()
     val apiStatus by vm.repository.apiStatus.collectAsStateWithLifecycle()
+    val modelStatus by vm.repository.modelStatus.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
     var editTask by remember { mutableStateOf<Task?>(null) }
@@ -55,7 +56,7 @@ import kotlinx.coroutines.delay
         topBar = { TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = Paper, titleContentColor = Ink, actionIconContentColor = Ink), title = { Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(34.dp).background(Brand, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.AllInclusive, null, tint = Color.White) }
             Spacer(Modifier.width(10.dp)); Text("时序", fontSize = 22.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.width(10.dp)); Text(if (owner.isGuest) "游客" else owner.username, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-        } }, actions = { IconButton(onClick = { vm.run { vm.repository.logout() } }, enabled = !busy) { Icon(Icons.Outlined.Logout, if (owner.isGuest) "返回登录" else "退出登录") }; if (tab != 4) IconButton(onClick = { vm.run { vm.repository.change(replan = true) { it } } }, enabled = !busy) { Icon(Icons.Outlined.Refresh, "重新排程") } }) },
+        } }, actions = { IconButton(onClick = { vm.run { vm.repository.logout() } }, enabled = !busy) { Icon(Icons.Outlined.Logout, if (owner.isGuest) "返回登录" else "退出登录") }; if (tab != 4) IconButton(onClick = { vm.run { if (state.preferences.localModelEnabled) vm.repository.generateModelPlan() else vm.repository.change(replan = true) { it } } }, enabled = !busy) { Icon(Icons.Outlined.Refresh, "重新排程") } }) },
         bottomBar = { NavigationBar(containerColor = Ink) { labels.forEachIndexed { index, label -> NavigationBarItem(selected = index == tab, onClick = { tab = index }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Ink, selectedTextColor = Color.White, indicatorColor = Color.White, unselectedIconColor = Color(0xFFC4BED6), unselectedTextColor = Color(0xFFC4BED6)), icon = {
             if (index == 1 && pending > 0) BadgedBox(badge = { Badge { Text(pending.toString()) } }) { Icon(icons[index], label) }
             else Icon(icons[index], label)
@@ -73,7 +74,8 @@ import kotlinx.coroutines.delay
                 }
             } }
             when (tab) {
-                0 -> TodayPage(state, today, now, busy, { tab = 1 }, { tab = 4 }) { type -> vm.run { vm.repository.generateReport(type) } }
+                0 -> TodayPage(state, today, now, busy, { tab = 1 }, { tab = 4 }, modelStatus,
+                    { vm.run { vm.repository.generateModelPlan() } }) { type -> vm.run { vm.repository.generateReport(type) } }
                 1 -> InboxPage(state, busy, onReview = { review = it },
                     onIgnore = { n -> vm.run { vm.repository.review(n.id, n.proposal.copy(action = Action.IGNORE)) } },
                     onReanalyze = { n -> vm.run { vm.repository.reanalyzeNotice(n.id) } })
@@ -133,6 +135,12 @@ import kotlinx.coroutines.delay
 private val pagePadding = PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 100.dp)
 private val gaps = Arrangement.spacedBy(14.dp)
 private data class Entry(val title: String, val start: Instant, val end: Instant, val block: Block? = null, val event: FixedEvent? = null)
+private fun formatElapsed(minutes: Long): String = when {
+    minutes < 1 -> "不到 1 分钟"
+    minutes < 60 -> "${minutes} 分钟"
+    minutes < 24 * 60 -> "${minutes / 60} 小时${(minutes % 60).takeIf { it > 0 }?.let { " $it 分钟" }.orEmpty()}"
+    else -> "${minutes / (24 * 60)} 天${((minutes % (24 * 60)) / 60).takeIf { it > 0 }?.let { " $it 小时" }.orEmpty()}"
+}
 private fun entries(state: LocalState, date: LocalDate): List<Entry> {
     val start = date.atStartOfDay(ZoneId.of(state.preferences.zone)).toInstant()
     val end = date.plusDays(1).atStartOfDay(ZoneId.of(state.preferences.zone)).toInstant()
@@ -156,14 +164,32 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
     }
 }
 
-@Composable private fun TodayPage(state: LocalState, date: LocalDate, now: Instant, busy: Boolean, openInbox: () -> Unit, openSettings: () -> Unit, onReport: (AiReportType) -> Unit) {
+@Composable private fun TodayPage(state: LocalState, date: LocalDate, now: Instant, busy: Boolean, openInbox: () -> Unit, openSettings: () -> Unit,
+    modelStatus: String, onModelPlan: () -> Unit, onReport: (AiReportType) -> Unit) {
     val rows = entries(state, date)
     val zone = ZoneId.of(state.preferences.zone)
     val dayStart = date.atStartOfDay(zone).toInstant(); val dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant()
     val focus = rows.filter { it.block != null }.sumOf { Duration.between(maxOf(it.start, dayStart), minOf(it.end, dayEnd)).toMinutes() }
     val pending = state.notices.count { it.status == NoticeStatus.REVIEW }
+    val completionSummary = CompletionTimingEngine.summary(state.tasks)
+    val activeAges = state.tasks.mapNotNull { task -> CompletionTimingEngine.activeAgeMinutes(task, now)?.let { task to it } }
+        .sortedByDescending { it.second }
     LazyColumn(contentPadding = pagePadding, verticalArrangement = gaps) {
-        item { PageHeading(date.format(DateTimeFormatter.ofPattern("M月d日 EEEE", java.util.Locale.CHINA)), "把今天，安排从容。", "群里的重要消息，变成你的时间计划。") }
+        item { PageHeading(date.format(DateTimeFormatter.ofPattern("M月d日 EEEE", java.util.Locale.CHINA)), "让模型，安排下一步。", "结合课表、截止时间与执行反馈，为重要任务留出空间。") }
+        item { Panel(color = Color(0xFFEEEDFF)) {
+            Text("时序 · 智能规划", fontWeight = FontWeight.Bold)
+            Text("模型已内置，在手机本地结合耗时与执行习惯安排计划。无需联网、服务器或微信/QQ通知权限。", style = MaterialTheme.typography.bodySmall)
+            Text(if (state.schedule.engine == "chronoflow-local") "当前计划：本机智能规划" else "当前计划：离线基础排程", fontWeight = FontWeight.Medium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = if (state.preferences.localModelEnabled) onModelPlan else openSettings, enabled = !busy) { Text(if (state.preferences.localModelEnabled) "生成智能计划" else "开启本机模型") }
+                TextButton(onClick = openSettings) { Text("模型与课程网站") }
+            }
+            Text(modelStatus, style = MaterialTheme.typography.labelSmall, color = Muted)
+            state.schedule.modelPredictions.take(4).forEach { f ->
+                Text("${state.tasks.firstOrNull { it.id == f.taskId }?.title ?: "任务"}：P50 ${f.p50Minutes} / P80 ${f.p80Minutes} / P95 ${f.p95Minutes} 分钟", style = MaterialTheme.typography.bodySmall)
+            }
+            Text("耗时分位数是预测，不能保证按期完成。任务或课表变化后请重新生成智能计划。", style = MaterialTheme.typography.labelSmall, color = Muted)
+        } }
         item { Panel(color = Ink) {
             Text("你的今日节奏", color = Color(0xFFD4CEFF), style = MaterialTheme.typography.titleSmall)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -174,10 +200,37 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
             HorizontalDivider(color = Color.White.copy(alpha = .15f))
             Text("全部保存在手机 · 排程 v${state.schedule.version}", color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.labelSmall)
         } }
+        item { Panel {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.QueryStats, null, tint = Teal)
+                Spacer(Modifier.width(8.dp))
+                Text("发布 → 完成效率", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            }
+            if (completionSummary == null) {
+                Text("完成带有发布时间的任务后，这里会分析完成周期。", style = MaterialTheme.typography.bodySmall, color = Muted)
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column { Text(formatElapsed(completionSummary.medianMinutes), fontWeight = FontWeight.Bold); Text("中位完成周期", style = MaterialTheme.typography.labelSmall, color = Muted) }
+                    Column { Text(formatElapsed(completionSummary.p80Minutes), fontWeight = FontWeight.Bold); Text("P80 完成周期", style = MaterialTheme.typography.labelSmall, color = Muted) }
+                    Column { Text("%.0f%%".format(completionSummary.within24HoursRate * 100), fontWeight = FontWeight.Bold); Text("24小时内完成", style = MaterialTheme.typography.labelSmall, color = Muted) }
+                }
+                completionSummary.onTimeRate?.let { Text("按时完成率 %.0f%%".format(it * 100), color = Teal, style = MaterialTheme.typography.bodySmall) }
+                completionSummary.medianDeadlineWindowUsage?.let { Text("中位截止窗口使用率 %.0f%%；超过 100% 表示完成时已逾期。".format(it * 100), style = MaterialTheme.typography.bodySmall, color = Muted) }
+                completionSummary.categories.take(3).forEach { category ->
+                    Text("${category.category.label} · ${category.sampleCount} 项 · 中位 ${formatElapsed(category.medianMinutes)} · P80 ${formatElapsed(category.p80Minutes)}",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Text("基于 ${completionSummary.sampleCount} 个有效完成样本；实际用时仍单独统计。", style = MaterialTheme.typography.labelSmall, color = Muted)
+            }
+            activeAges.firstOrNull()?.let { (task, age) ->
+                HorizontalDivider()
+                Text("当前等待最久：${task.title} · 发布后已 ${formatElapsed(age)}", style = MaterialTheme.typography.bodySmall)
+            }
+        } }
         if (!state.preferences.enabled) item { Panel(color = Color(0xFFEEEDFF)) {
-            Text("从一条群通知开始", fontWeight = FontWeight.Bold)
-            Text("添加微信或 QQ 群白名单，再开启系统通知访问。也可以先手动粘贴通知。", style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = openSettings) { Text("设置通知来源 →") }
+            Text("任务来源，由你选择", fontWeight = FontWeight.Bold)
+            Text("直接创建任务、导入Canvas课程作业，或手动粘贴信息。微信/QQ通知提取是默认关闭的可选功能。", style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = openSettings) { Text("连接课程网站与可选来源 →") }
         } }
         if (pending > 0) item { FilledTonalButton(onClick = openInbox, modifier = Modifier.fillMaxWidth()) { Text("$pending 条识别结果，等待你确认 →") } }
         items(IntelligenceEngine.risks(state, now)) { RiskPanel(it) }
@@ -269,6 +322,15 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
             }
             Text("${task.group.ifBlank { "个人任务" }} · 剩余 ${task.remaining} 分钟", color = Muted, style = MaterialTheme.typography.bodySmall)
             Text("${PersonalTimeModel.resolvedCategory(task).label} · 难度 ${task.difficulty}/5", color = Muted, style = MaterialTheme.typography.bodySmall)
+            task.releasedAt?.let { Text("发布 ${formatTime(it, state.preferences.zone)}", color = Muted, style = MaterialTheme.typography.bodySmall) }
+            CompletionTimingEngine.timing(task)?.let { timing ->
+                Text("发布后 ${formatElapsed(timing.releaseToCompletionMinutes)} 完成" +
+                    timing.deadlineWindowUsage?.let { " · 使用截止窗口 %.0f%%".format(it * 100) }.orEmpty(),
+                    color = Teal, style = MaterialTheme.typography.bodySmall)
+                timing.nonExecutionGapMinutes?.let { Text("非执行间隔约 ${formatElapsed(it)}（完成周期 − 实际用时）", color = Muted, style = MaterialTheme.typography.labelSmall) }
+            } ?: CompletionTimingEngine.activeAgeMinutes(task, Instant.now())?.let {
+                Text("发布后已 ${formatElapsed(it)}，尚未完成", color = Teal, style = MaterialTheme.typography.bodySmall)
+            }
             IntelligenceEngine.personalDurationSuggestion(task, state)?.let { insight ->
                 if (insight.sampleCount > 0) Text("个人耗时模型：历史倍率 %.1f，建议约 ${insight.minutes} 分钟".format(insight.multiplier),
                     color = Teal, style = MaterialTheme.typography.bodySmall)

@@ -16,7 +16,8 @@ fun main(args: Array<String>) {
         val files = File(args.single()).walkTopDown().filter { it.isFile && (it.extension == "kt" || it.extension == "kts") }.toList()
         var errors = 0
         files.forEach { file ->
-            val parsed = factory.createFile(file.name, file.readText())
+            // PSI expects normalized newlines, unlike the command-line compiler.
+            val parsed = factory.createFile(file.name, file.readText().replace("\r\n", "\n"))
             PsiTreeUtil.collectElementsOfType(parsed, PsiErrorElement::class.java).forEach { error ->
                 errors++
                 println("${file.path}:${error.textOffset}: ${error.errorDescription}")

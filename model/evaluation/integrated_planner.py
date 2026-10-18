@@ -119,7 +119,8 @@ def integrated_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config
         for size in sizes:
             local_ids={t.id for t in ranked[:size]}
             tried.append(size)
-            retained=[b for b in old if b.task_id not in local_ids or b.start<now+config['freeze_minutes']]
+            retained=[b for b in old if b.task_id not in local_ids or b.start<now+config['freeze_minutes'] or
+                      (b.task_id,b.start,b.end) in config.get('_locked_blocks',[])]
             found=False
             for q in (.5,.8,.95):
                 durations={}

@@ -1,5 +1,3 @@
-plugins {
-    id("com.android.application") version "8.7.3" apply false
-    id("org.jetbrains.kotlin.android") version "2.1.0" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.0" apply false
-}
+// This single-module project declares its build plugins in app/build.gradle.kts.
+// Keep their classpath and Chaquopy runtime configurations owned by :app so
+// Android Studio builds do not resolve root-owned state from a Kotlin task.

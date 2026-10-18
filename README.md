@@ -1,65 +1,30 @@
-# 时序 · ChronoFlow 手机本地版
+# 时序 · ChronoFlow 智能日程规划
 
-网页版位于 [apps/web](apps/web/README.md)：包含今天、通知核对、任务、日历、复盘和设置，支持通知录入、任务管理、时间安排与本机数据保存。在 `apps/web` 下执行 `node server.mjs`，访问 `http://127.0.0.1:4173/` 即可使用，无需安装前端依赖。AI 可选择开发者提供的官方接口或用户自备接口，比赛 / 正式使用的切换方式见 [网页版 API 配置](apps/web/API.md)。
+Android 是当前模型产品入口：已训练的 ONNX 权重、特征编码、风险感知滚动规划器随 APK 打包，任务与课表在手机内处理，无需电脑、模型服务器或 DeepSeek 密钥。网页暂不接入该模型，继续提供基础排程和课程网站导入。
 
-当前主线是 **Kotlin + Jetpack Compose 原生 Android 应用**：提取微信、QQ 群系统通知，或通过 Canvas 官方 API 同步课程信息，再使用本地规则或用户选择的 AI 接口识别内容，并在手机上确认、保存和安排日程。
+手动任务 / Canvas课程作业 → 核对 → 手机预测耗时和时段执行概率 → 安排日程 → 完成、跳过或延后反馈 → 个性化重排。
 
-App 已在源码中加入本机登录 / 注册与游客入口、分账号工作空间，以及官方 / 用户 AI 接口。比赛阶段通过服务端官方接口使用开发者额度，正式阶段由用户接入自己的模型服务。迁移与部署方式见 [Android 账号与接口说明](docs/ANDROID_ACCOUNTS_API.md)；这些新增改动尚未进行 Gradle 编译、APK 打包或真机验收。
+- Android Studio 打开 `apps/android`，原生 Kotlin + Compose，内置 Python 规划器和 ONNX Runtime；不是旧 Flutter 工程。
+- 默认启用本机模型；首页显示当前计划来源和 P50/P80/P95 耗时。任务或课表变动会尝试更新；推理失败明确标为基础排程，手动生成失败保留原计划。
+- Canvas 连接保留课程、作业、公告和日历同步，新增或变更先确认。
+- 微信/QQ通知采集默认关闭，需白名单与系统通知访问授权，不影响本机模型使用。
+- 可选 LLM 文本理解、摘要和复盘仍需要所选服务的网络/API配置，与本机规划模型独立。
+- App本地数据加密保存；无跨设备云同步。网页仍在浏览器保存工作空间。
 
-**Android Studio 请打开 [apps/android](apps/android)，不是旧的 apps/mobile。**
+## 手机端构建
 
-```text
-微信 / QQ 系统通知（仅白名单群）
-Canvas API（课程、作业、公告、课程日历）
-    → 本地规则或 DeepSeek 提取 → 核对新增 / 修改 / 取消
-    → 手机任务与固定日程 → 本地排程 → 时间表与开始提醒
-```
+见 [手机模型嵌入与验收](docs/ANDROID_EMBEDDED_MODEL.md)。首次 Gradle 同步需下载 Chaquopy、ONNX Runtime Android、内置 Python 和时区数据。当前构建已使用你同步后的本机缓存离线完成。构建机需 Python 3.12，手机无需另装 Python、Docker 或服务器软件。
 
-## 已写入代码
+模型入口与规划调用的66项Python测试及网页检查已通过。2026-10-18已完成Android单元测试和Debug APK构建，并核验APK内模型权重哈希、规划代码及运行库。手机飞行模式下的真实推理仍待验收；打包成功不等于设备推理已验证。
 
-- 原生中文五页面：今天、发现、任务、日历、设置。
-- 微信、QQ 系统通知监听；应用 + 群名白名单；普通正文、长文本、多消息处理与去重。
-- Canvas 连接器：用户在学校站点登录并创建个人 Access Token；同步活动课程的作业、公告和课程日历，支持重复过滤与内容/时间变更追踪。
-- 常见中文日期、截止、耗时、会议/考试时间段、延期与取消的规则提取。
-- 默认确认后应用；可选自动应用明确且完整的新建事项。歧义、修改与取消仍需确认。
-- 任务和固定日程；30分钟粒度、14天窗口的本地排程；锁定、连续时段与缺口提示。
-- 可选 DeepSeek：多事项拆分、上下文关联、任务拆解、原文依据、每日摘要、风险预测和每周复盘。
-- 端侧不确定性感知：对动作、名称、时间、目标匹配和原文证据分别评分，只提出最多两个优先级最高的问题；修改与取消始终需要确认。
-- 可学习的个人时间模型：按任务类型、课程、难度、初始估时和实际耗时学习耗时倍率；记录时间块的完成、跳过与延后，优先安排历史上更容易完成的时段。
-- 所有个人模型与执行记录均留在本机，并使用 Android Keystore + AES-GCM 加密保存；无需自建服务器。
-- 非精确的本地开始提醒，可能受到省电模式和厂商后台限制影响。
+## 网页
 
-## 验证状态
+在 `apps/web` 运行 `node server.mjs`，打开 `http://127.0.0.1:4173/`。网页无本项目训练模型的设置、按钮或代理接口；保留任务、日历、课程网站和独立的可选 LLM 文本识别。
 
-生产核心、Android 工程和 Debug APK 已实际编译；57项核心回归检查通过，包含字段级不确定性、个性化时间模型及100组随机排程检查。Kotlin/Gradle Kotlin DSL语法、Android XML与配置静态检查通过。
+## 算法与检查
 
-Android Debug APK 已完成编译，JVM 单元测试通过，用户已在一加 Ace 5 上完成 USB 调试连接。微信/QQ真实通知、DeepSeek API、后台提醒和不同屏幕的真机验收仍需继续执行。
+`model` 中执行 `python -m unittest discover -s tests -v`；`apps/web` 中执行 `npm run check`。
 
-## 打开与使用
+手机直接复用 `model/evaluation` 中的主规划器和 `model/src/chronoflow_model` 中的特征编码，构建时按白名单打包；不包含数据集、实验报告、训练环境或学校凭据。已训练权重来自核验过的归档，SHA256见 `model/deployment/artifacts/checksums.json`，无需重新训练。
 
-详见 [原生手机端说明](docs/ANDROID_LOCAL.md)。后续需要 Android Studio、Android SDK 和构建依赖，**不需要 Flutter、Python、Docker或数据库服务器**。DeepSeek 功能需要用户自己的 API Key，关闭 AI 后本地功能仍可使用。
-
-```text
-apps/android/            当前主线：原生Android本地版
-  app/src/main/kotlin/com/chronoflow/local/
-    domain/              解析、过滤、状态变更、排程、提醒选择
-    ai/                  DeepSeek结构化分析与学习报告
-    canvas/              Canvas官方REST API客户端与安全分页
-    data/                加密持久化与本地Repository
-    notifications/       通知监听、系统提醒
-    ui/                  Compose五页面及编辑/确认表单
-  app/src/test/          核心回归检查
-  app/src/androidTest/   待设备运行的存储与界面测试
-scripts/test-local-core.ps1     使用已有Kotlin/JDK，不安装工具
-scripts/check-local-android.py 静态工程检查
-apps/mobile/            保留的旧Flutter客户端，当前无需运行
-services/backend/       保留的旧后端，当前无需运行
-```
-
-旧Docker与Flutter脚本不属于当前本地版启动步骤。当前CI已指向原生Android并通过云端构建。
-
-## 使用边界
-
-只能获得系统实际展示的通知，不能读取微信或QQ聊天数据库与历史消息。隐藏正文、免打扰、通知聚合和应用版本差异可能导致遗漏，遗漏可手动粘贴。
-
-本地规则适合明确通知；启用 DeepSeek 后可以拆分复合通知并理解上下文。模型输出还会经过本地字段级校验，低置信度字段会要求核对，但该机制不能保证结果绝对正确。个人时间建议需要逐步积累完成、跳过、延后和实际耗时数据；样本较少时采用保守先验。排程采用启发式算法，显示缺口表示本轮未找到足够时间，不是数学上的无解证明。
+回放实验与真实用户试验应分开描述；既有实验分数不能直接当作手机真实使用收益。`model-final` 为本地归档，不进入Git。模型可预测耗时和风险，但不保证任务完成或全局最优。

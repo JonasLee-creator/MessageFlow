@@ -65,9 +65,15 @@ private fun access(context: android.content.Context): Boolean {
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
     }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { PageHeading("YOUR PHONE. YOUR DATA.", "连接，你的信息。", "计划加密保存在手机，信息来源和 AI 接口由你选择。") }
+        item { PageHeading("CHRONOFLOW", "计划，在手机里完成。", "模型规划是主引擎；课程网站和群通知是独立可选的信息来源。") }
         item { Panel {
-            Text("1 · 选择课程群", style = MaterialTheme.typography.titleMedium)
+            Text("智能日程规划", style = MaterialTheme.typography.titleMedium)
+            Text("训练模型已随应用内置，在本机预测任务耗时和执行概率，再结合课表与期限生成计划。无需服务器、联网或大模型密钥。", style = MaterialTheme.typography.bodySmall)
+            Toggle("开启本机智能规划", p.localModelEnabled, enabled = !busy) { onSave(p.copy(localModelEnabled = it)) }
+            Text("任务、课表和执行反馈在手机内处理。首次使用会初始化模型；复杂计划可能需要等待。关闭后使用基础排程。课程网站同步和可选AI文本分析分别需要网络。", style = MaterialTheme.typography.bodySmall, color = Muted)
+        } }
+        item { Panel {
+            Text("可选 · 微信/QQ课程群", style = MaterialTheme.typography.titleMedium)
             Text("按微信、QQ 分别填写群名。需与系统通知显示的群名一致，只处理白名单中的通知。", style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(Source.WECHAT, Source.QQ).forEach { item -> FilterChip(source == item.name, { source = item.name }, label = { Text(item.label) }) }
@@ -115,7 +121,8 @@ private fun access(context: android.content.Context): Boolean {
             Text("App 不接触 Canvas 密码。Token 与本地计划一起由 Android Keystore 加密，且只发送到你填写的同一 HTTPS Canvas 主机。若学校禁用了个人 Token，需要管理员提供 Canvas Developer Key 后才能改用 OAuth。", style = MaterialTheme.typography.bodySmall, color = Muted)
         } }
         item { Panel {
-            Text("2 · 授权通知访问", style = MaterialTheme.typography.titleMedium)
+            Text("可选 · 系统通知提取（默认关闭）", style = MaterialTheme.typography.titleMedium)
+            Text("不授权也能使用模型规划、手动任务和Canvas。", style = MaterialTheme.typography.bodySmall)
             Text(if (granted) "系统通知访问已授权" else "系统通知访问未授权", color = Teal)
             Text("系统授权可以访问通知。本应用仅处理微信、QQ 白名单群的相关消息，不读取聊天记录。", style = MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }.onFailure { message = "无法打开设置，请在系统设置中查找通知使用权。" } }) { Text("打开系统授权设置") }
@@ -152,6 +159,6 @@ private fun access(context: android.content.Context): Boolean {
             Text("使用系统普通定时提醒，省电模式或厂商后台限制可能造成延迟，不作为精确闹钟。", style = MaterialTheme.typography.bodySmall, color = Muted)
         } }
         message?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { Text("时序 0.4.0\n微信/QQ仅能提取系统实际展示的通知文字；Canvas 通过官方 API 同步。\n原始通知最多保留1000条，卸载或清除应用数据会删除本地计划与密钥。", style = MaterialTheme.typography.bodySmall, color = Muted, modifier = Modifier.padding(bottom = 20.dp)) }
+        item { Text("时序 0.5.0\n微信/QQ仅能提取系统实际展示的通知文字；Canvas 通过官方 API 同步。\n原始通知最多保留1000条，卸载或清除应用数据会删除本地计划与密钥。", style = MaterialTheme.typography.bodySmall, color = Muted, modifier = Modifier.padding(bottom = 20.dp)) }
     }
 }

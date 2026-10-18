@@ -19,7 +19,9 @@ def build_schedule(tasks, progress, completed, now, horizon, fixed, old, origin,
     freeze = config['freeze_minutes']
     at = lambda m: origin+timedelta(minutes=m)
     # All methods obey the same near-term commitments and fixed-event constraints.
-    locked = [b for b in old if b.end>now and (preserve_old or b.start<now+freeze) and b.task_id not in completed]
+    explicit_locks = set(tuple(b) for b in config.get('_locked_blocks',[]))
+    locked = [b for b in old if b.end>now and (preserve_old or b.start<now+freeze or
+              (b.task_id,b.start,b.end) in explicit_locks) and b.task_id not in completed]
     result = list(locked)
     day_load = dict(used)
     for b in locked:

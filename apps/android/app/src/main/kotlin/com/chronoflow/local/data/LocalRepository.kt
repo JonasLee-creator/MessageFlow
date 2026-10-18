@@ -20,6 +20,8 @@ class LocalRepository(context: Context) {
     private var store = EncryptedStore(appContext)
     private val deepSeek = AiClient()
     private val canvas = CanvasClient()
+    private val modelPlanner = com.chronoflow.local.model.ModelPlannerClient(appContext)
+    val modelStatus = MutableStateFlow("尚未生成智能计划")
     private val mutex = Mutex()
     private val canvasMutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -57,6 +59,25 @@ class LocalRepository(context: Context) {
         finally { initialized.value = true }
     }
     suspend fun awaitReady() { ready.await() }
+    suspend fun generateModelPlan() = withContext(Dispatchers.IO) {
+        awaitReady()
+        val ownerVersion = generation
+        val snapshot = mutable.value
+        require(mutableSession.value != null) { "请先进入工作空间" }
+        modelStatus.value = "正在为你安排时间…"
+        try {
+            val schedule = modelPlanner.plan(snapshot)
+            mutex.withLock {
+                require(generation == ownerVersion && mutable.value == snapshot && snapshot.preferences.localModelEnabled) { "工作空间或任务已变化，请重新生成" }
+                val next = snapshot.copy(schedule = schedule)
+                store.save(next); publish(next)
+                modelStatus.value = "智能计划已生成"
+            }
+        } catch (e: Exception) {
+            if (generation == ownerVersion) modelStatus.value = "模型规划未完成，原计划保留"
+            throw e
+        }
+    }
     suspend fun withCurrentWorkspace(version: Long, action: (LocalSession?, LocalState) -> Unit) = withContext(Dispatchers.IO) {
         ready.await()
         mutex.withLock { if (generation == version) action(mutableSession.value, mutable.value) }
@@ -66,7 +87,30 @@ class LocalRepository(context: Context) {
         mutex.withLock {
             if (mutableSession.value == null || (expectedGeneration != null && generation != expectedGeneration)) return@withLock
             var next = edit(mutable.value)
-            if (replan) next = next.copy(schedule = LocalScheduler.plan(next, Instant.now()))
+            val before = mutable.value
+            if (replan || next.schedule != before.schedule) {
+                // LocalEngine returns a provisional basic plan. Do not treat its
+                // newly generated blocks as commitments for the model.
+                val commitments = if (next.executionHistory != before.executionHistory) next.schedule
+                    else if (next.tasks != before.tasks || next.events != before.events) before.schedule else next.schedule
+                val input = next.copy(schedule = commitments)
+                next = if (next.preferences.localModelEnabled && next.tasks.any { it.status == TaskStatus.ACTIVE && it.remaining > 0 }) {
+                    modelStatus.value = "正在手机内生成计划…"
+                    try {
+                        val planned = modelPlanner.plan(input)
+                        modelStatus.value = "本机智能计划已生成"
+                        next.copy(schedule = planned)
+                    } catch (e: Exception) {
+                        // Data edits are still saved. The UI explicitly identifies
+                        // this fallback as a basic plan, never a model result.
+                        modelStatus.value = "本机模型未完成，当前使用基础排程。可在首页重试。"
+                        next.copy(schedule = LocalScheduler.plan(input, Instant.now()))
+                    }
+                } else {
+                    modelStatus.value = if (next.preferences.localModelEnabled) "添加任务后即可使用本机模型" else "本机模型已关闭，当前使用基础排程"
+                    next.copy(schedule = LocalScheduler.plan(input, Instant.now()))
+                }
+            }
             if (next != mutable.value) {
                 store.save(next) // Publish only after a successful atomic save.
                 publish(next)
@@ -80,12 +124,13 @@ class LocalRepository(context: Context) {
             val nextStore = EncryptedStore(appContext, owner.userId)
             val previous = nextStore.load()
             val loaded = deploymentPolicy(previous)
-            val next = loaded.copy(schedule = LocalScheduler.plan(loaded, Instant.now()))
+            val next = loaded
             if (next != previous) nextStore.save(next)
             accounts.rememberSession(owner)
             generation++; store = nextStore
             runCatching { Reminders.clear(appContext) }
             aiError.value = null; apiStatus.value = "接口未测试"
+            modelStatus.value = if (next.schedule.engine == "chronoflow-local") "已恢复本机智能计划" else "添加任务后生成本机智能计划"
             lastNotification.value = "等待当前工作空间的群通知"
             canvasStatus.value = if (next.preferences.canvasEnabled) "Canvas 已连接，可立即同步" else "未连接 Canvas"
             publish(next, owner)
@@ -121,7 +166,7 @@ class LocalRepository(context: Context) {
     }
     suspend fun receive(envelope: NotificationEnvelope) {
         awaitReady()
-        if (mutableSession.value == null) return
+        if (mutableSession.value == null || !mutable.value.preferences.enabled) return
         val version = generation
         val inputs = NotificationMatcher.extract(envelope, mutable.value.preferences)
         val app = when (envelope.packageName) { Source.WECHAT.packageName -> "微信"; Source.QQ.packageName -> "QQ"; else -> envelope.packageName }
@@ -177,10 +222,13 @@ class LocalRepository(context: Context) {
     }
     suspend fun review(id: String, proposal: Proposal) = change { LocalEngine.apply(it, id, proposal, Instant.now()) }
     suspend fun saveTask(task: Task) = change { LocalEngine.saveTask(it, task, Instant.now()) }
-    suspend fun completeTask(id: String, cancel: Boolean = false) = change(replan = true) { s -> s.copy(tasks = s.tasks.map { t ->
-        if (t.id != id) t else t.copy(status = if (cancel) TaskStatus.CANCELLED else TaskStatus.COMPLETED,
-            remaining = if (cancel) t.remaining else 0, completedAt = if (cancel) null else Instant.now())
-    }) }
+    suspend fun completeTask(id: String, cancel: Boolean = false) {
+        val now = Instant.now()
+        change(replan = true) { s -> s.copy(tasks = s.tasks.map { t ->
+            if (t.id != id) t else t.copy(status = if (cancel) TaskStatus.CANCELLED else TaskStatus.COMPLETED,
+                remaining = if (cancel) t.remaining else 0, completedAt = if (cancel) null else now)
+        }) }
+    }
     suspend fun toggleSubTask(taskId: String, subTaskId: String) = change { state -> state.copy(tasks = state.tasks.map { task ->
         if (task.id != taskId) task else task.copy(subTasks = task.subTasks.map { sub -> if (sub.id != subTaskId) sub else sub.copy(done = !sub.done) })
     }) }

@@ -6,6 +6,6 @@
   "scripts": {
     "dev": "node server.mjs",
     "start": "node --env-file=.env server.mjs",
-    "check": "node --check dist/app.js && node --check dist/auth.js && node --check dist/api-client.js && node --check server.mjs && node --check api/gateway.mjs && node --check api/mobile.mjs && node check.mjs && node check-auth.mjs && node check-api.mjs && node check-api-client.mjs && node check-mobile-api.mjs"
+    "check": "node --check dist/app.js && node --check dist/auth.js && node --check dist/api-client.js && node --check server.mjs && node --check api/gateway.mjs && node --check api/mobile.mjs && node --check api/canvas.mjs && node check.mjs && node check-auth.mjs && node check-api.mjs && node check-api-client.mjs && node check-mobile-api.mjs && node check-canvas.mjs"
   }
 }

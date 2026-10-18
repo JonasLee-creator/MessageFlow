@@ -5,8 +5,10 @@ __pycache__/
 *.pyc
 *.db
 .env
+.env.model
 .local-secret
 .checks/
+/model-final/
 evaluation/data/raw-private/
 evaluation/data/sealed-test/sealed-test-gold.jsonl
 .dart_tool/

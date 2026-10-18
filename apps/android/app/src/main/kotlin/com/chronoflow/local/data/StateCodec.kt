@@ -16,11 +16,12 @@ object StateCodec {
 
     fun encode(state: LocalState): ByteArray {
         val p = state.preferences
-        return obj("schema" to 3, "preferences" to obj("enabled" to p.enabled, "autoCreate" to p.autoCreate,
+        return obj("schema" to 4, "preferences" to obj("enabled" to p.enabled, "autoCreate" to p.autoCreate,
             "startHour" to p.startHour, "endHour" to p.endHour, "zone" to p.zone, "reminders" to p.reminders,
             "aiEnabled" to p.aiEnabled, "deepSeekApiKey" to p.deepSeekApiKey, "deepSeekModel" to p.deepSeekModel,
             "aiApiMode" to p.aiApiMode.name, "aiBaseUrl" to p.aiBaseUrl,
             "officialGatewayUrl" to p.officialGatewayUrl, "officialAccessCode" to p.officialAccessCode,
+            "localModelEnabled" to p.localModelEnabled,
             "canvasEnabled" to p.canvasEnabled, "canvasBaseUrl" to p.canvasBaseUrl, "canvasAccessToken" to p.canvasAccessToken,
             "groups" to arr(p.groups.map { obj("source" to it.source.name, "name" to it.name) })),
             "notices" to arr(state.notices.map { n -> obj("id" to n.id, "status" to n.status.name, "appliedId" to n.appliedId,
@@ -31,9 +32,12 @@ object StateCodec {
                 "splittable" to t.splittable, "status" to t.status.name, "deadlineLocked" to t.deadlineLocked, "sourceIds" to arr(t.sourceIds),
                 "subTasks" to arr(t.subTasks.map { s -> obj("id" to s.id, "title" to s.title, "done" to s.done) }),
                 "actualMinutes" to t.actualMinutes, "completedAt" to t.completedAt?.toString(), "deadlineChanges" to t.deadlineChanges,
-                "category" to t.category.name, "difficulty" to t.difficulty, "originalEstimateMinutes" to t.originalEstimateMinutes) }),
+                "category" to t.category.name, "difficulty" to t.difficulty, "originalEstimateMinutes" to t.originalEstimateMinutes,
+                "releasedAt" to t.releasedAt?.toString()) }),
             "events" to arr(state.events.map { e -> obj("id" to e.id, "title" to e.title, "start" to e.start.toString(), "end" to e.end.toString(), "group" to e.group, "source" to e.source.name, "sourceIds" to arr(e.sourceIds)) }),
             "schedule" to obj("version" to state.schedule.version, "generatedAt" to state.schedule.generatedAt?.toString(),
+                "engine" to state.schedule.engine, "modelPredictions" to arr(state.schedule.modelPredictions.map { f ->
+                    obj("taskId" to f.taskId, "p50Minutes" to f.p50Minutes, "p80Minutes" to f.p80Minutes, "p95Minutes" to f.p95Minutes) }),
                 "blocks" to arr(state.schedule.blocks.map { b -> obj("id" to b.id, "taskId" to b.taskId, "start" to b.start.toString(), "end" to b.end.toString(), "locked" to b.locked) }),
                 "risks" to arr(state.schedule.risks.map { r -> obj("title" to r.title, "message" to r.message, "missingMinutes" to r.missingMinutes) })),
             "reminded" to arr(state.reminded),
@@ -58,7 +62,7 @@ object StateCodec {
 
     fun decode(bytes: ByteArray): LocalState {
         val root = JSONObject(String(bytes, Charsets.UTF_8))
-        require(root.getInt("schema") in 1..3) { "本地数据版本不受支持" }
+        require(root.getInt("schema") in 1..4) { "本地数据版本不受支持" }
         val p = root.getJSONObject("preferences")
         val preferences = Preferences(p.getBoolean("enabled"), p.rows("groups").map { GroupRule(Source.valueOf(it.getString("source")), it.getString("name")) },
             p.optBoolean("autoCreate"), p.getInt("startHour"), p.getInt("endHour"), p.getString("zone"), p.optBoolean("reminders", true),
@@ -66,7 +70,8 @@ object StateCodec {
             p.optBoolean("canvasEnabled"), p.optString("canvasBaseUrl"), p.optString("canvasAccessToken"),
             aiApiMode = if (p.has("aiApiMode")) ApiMode.valueOf(p.getString("aiApiMode")) else ApiMode.USER,
             aiBaseUrl = p.optString("aiBaseUrl", "https://api.deepseek.com"),
-            officialGatewayUrl = p.optString("officialGatewayUrl"), officialAccessCode = p.optString("officialAccessCode"))
+            officialGatewayUrl = p.optString("officialGatewayUrl"), officialAccessCode = p.optString("officialAccessCode"),
+            localModelEnabled = p.optBoolean("localModelEnabled", true))
         val notices = root.rows("notices").map { n ->
             val i = n.getJSONObject("input"); val q = n.getJSONObject("proposal")
             val uncertainty = q.optJSONObject("uncertainty")?.let { u ->
@@ -93,11 +98,16 @@ object StateCodec {
             actualMinutes = if (t.has("actualMinutes") && !t.isNull("actualMinutes")) t.getInt("actualMinutes") else null,
             completedAt = t.instant("completedAt"), deadlineChanges = t.optInt("deadlineChanges"),
             category = runCatching { TaskCategory.valueOf(t.optString("category", TaskCategory.AUTO.name)) }.getOrDefault(TaskCategory.AUTO),
-            difficulty = t.optInt("difficulty", 3).coerceIn(1, 5), originalEstimateMinutes = t.optInt("originalEstimateMinutes", t.getInt("minutes"))) }
+            difficulty = t.optInt("difficulty", 3).coerceIn(1, 5), originalEstimateMinutes = t.optInt("originalEstimateMinutes", t.getInt("minutes")),
+            releasedAt = t.instant("releasedAt") ?: t.strings("sourceIds").mapNotNull { sourceId ->
+                notices.firstOrNull { it.id == sourceId }?.input?.receivedAt
+            }.minOrNull()) }
         val events = root.rows("events").map { e -> FixedEvent(e.getString("id"), e.getString("title"), Instant.parse(e.getString("start")), Instant.parse(e.getString("end")), e.getString("group"), Source.valueOf(e.getString("source")), e.strings("sourceIds")) }
         val s = root.getJSONObject("schedule")
         val schedule = Schedule(s.getInt("version"), s.rows("blocks").map { b -> Block(b.getString("id"), b.getString("taskId"), Instant.parse(b.getString("start")), Instant.parse(b.getString("end")), b.getBoolean("locked")) },
-            s.rows("risks").map { r -> Risk(r.getString("title"), r.getString("message"), r.getInt("missingMinutes")) }, s.instant("generatedAt"))
+            s.rows("risks").map { r -> Risk(r.getString("title"), r.getString("message"), r.getInt("missingMinutes")) }, s.instant("generatedAt"),
+            engine = s.optString("engine", "basic"), modelPredictions = s.rows("modelPredictions").map { f ->
+                TaskForecast(f.getString("taskId"), f.getInt("p50Minutes"), f.getInt("p80Minutes"), f.getInt("p95Minutes")) })
         val reports = root.rows("aiReports").map { r -> AiReport(r.getString("id"), AiReportType.valueOf(r.getString("type")),
             r.getString("title"), r.getString("summary"), r.strings("bullets"), Instant.parse(r.getString("generatedAt"))) }
         val history = root.rows("executionHistory").map { e -> ExecutionRecord(e.getString("id"), e.getString("taskId"),

@@ -20,6 +20,6 @@ class NavigationTest {
             rule.onNodeWithText(tab, useUnmergedTree = true).performClick()
             rule.waitForIdle()
         }
-        rule.onNodeWithText("把今天，安排从容。").assertIsDisplayed()
+        rule.onNodeWithText("让模型，安排下一步。").assertIsDisplayed()
     }
 }

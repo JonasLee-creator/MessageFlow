@@ -31,4 +31,18 @@ for file in domain.glob("*.kt"):
 print(f"{len(xmls)} Android XML files parse successfully")
 print("Opt-in DeepSeek/Canvas network permission present; no Flutter build dependency; backup disabled")
 print("Notification binding, component sources and pure Kotlin domain checks passed")
+import hashlib
+import json
+artifacts = root / "model/deployment/artifacts"
+for name, digest in json.loads((artifacts / "checksums.json").read_text()).items():
+    assert Path(name).name == name
+    assert hashlib.sha256((artifacts / name).read_bytes()).hexdigest() == digest
+client = (main / "kotlin/com/chronoflow/local/model/ModelPlannerClient.kt").read_text(encoding="utf-8")
+assert "EmbeddedModelRuntime.plan" in client and "HttpURLConnection" not in client
+assert 'id("com.chaquo.python") version "17.1.0"' in build and "onnxruntime-android" in build
+assert 'id("com.chaquo.python")' not in (android / "build.gradle.kts").read_text(encoding="utf-8")
+assert 'include("chronoflow_predictor.onnx"' in build
+assert '"deployment/android.py"' in build
+assert "dataset" not in build.split('val syncEmbeddedPython')[1].split('dependencies {')[0]
+print("Bundled artifact checksums, offline entry and explicit production packaging checks passed")
 print("This is not Gradle/Android compilation or real-device verification.")

@@ -43,6 +43,30 @@ let toastTimer;
 function toast(message) {const el=document.getElementById('toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3400);}
 const btn=(label,action,ico='',classes='')=>`<button class="btn ${classes}" data-action="${action}">${ico?icon(ico):''}${label}</button>`;
 const routeNames={today:'今天',inbox:'发现',tasks:'任务',calendar:'日历',reports:'复盘',settings:'设置'};
+let canvasBusy=false;
+function canvasPanel(){return `<section class="panel settings-panel"><h2>课程网站 · Canvas</h2><p>使用学校官方API读取课程作业，先进入「发现」确认，再加入日程。App同时保留公告与课程日历同步。</p><form id="canvas-form"><div class="field"><label>学校站点</label><input type="url" name="baseUrl" required placeholder="https://school.instructure.com"></div><div class="field"><label>Canvas Access Token</label><input type="password" name="token" required autocomplete="off"></div><p class="tiny muted">密码在学校网站输入；Token仅用于本次同站点请求，不保存到浏览器。</p><button class="btn" type="submit">${canvasBusy?'正在同步…':'授权并读取作业'}</button></form><p class="tiny muted">微信/QQ自动通知采集仅在Android中提供，默认关闭且需单独授权；网页无需这些权限。</p></section>`;}
+async function importCanvas(form){
+  if(canvasBusy)return;
+  const owner=session,data=Object.fromEntries(new FormData(form));canvasBusy=true;
+  form.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{
+    const response=await fetch('/api/connectors/canvas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,consent:true}),signal:AbortSignal.timeout(120000)});
+    const result=await response.json();if(session!==owner)return;if(!response.ok)throw Error(result.error);
+    let added=0;
+    for(const item of result.items){
+      const prior=state.notices.find(n=>n.sourceKey===item.sourceKey);
+      if(prior&&prior.proposalTitle===item.title&&prior.deadline===item.deadline)continue;
+      const target=state.tasks.find(t=>t.sourceKey===item.sourceKey);
+      const notice={id:uid(),sourceKey:item.sourceKey,title:'Canvas课程作业',source:'Canvas',group:item.course,course:item.course,
+        received:new Date().toISOString(),releasedAt:item.releasedAt,text:item.title,action:target?'update':'create',target:target?.id,
+        proposalTitle:item.title,deadline:item.deadline,minutes:target?.remaining||60,status:'review',evidence:'来自Canvas官方API；预计耗时暂填60分钟，请确认。'};
+      if(prior?.status==='review')Object.assign(prior,notice,{id:prior.id});else state.notices.unshift(notice);
+      added++;
+    }
+    save();closeModal();navigate('inbox');toast(`已导入${added}条待确认事项${result.truncated?'；达到本轮数量上限，可在App查看完整课程内容':''}`);
+  }catch(error){if(session===owner)toast(error.message||'Canvas同步失败');}
+  finally{canvasBusy=false;form.querySelector('[name="token"]').value='';form.querySelectorAll('button').forEach(b=>b.disabled=false);}
+}
 function apiSettingsPanel() {
   const config=ai.state(),production=config.service?.stage==='production';
   return `<section class="panel settings-panel api-panel"><h2>AI 接口</h2><p>选择官方接口，或接入自己的模型服务。识别结果核对后才会更新计划。</p>
@@ -119,7 +143,7 @@ function authView() {
       <div class="auth-story-content">
         <p class="auth-eyebrow">MAKE ROOM FOR WHAT MATTERS</p>
         <h1>把时间，<br>留给<span>重要的事。</span></h1>
-        <p class="auth-story-description">从纷杂的消息，到清晰的下一步。<br>把每天的任务与日程，安放在合适的位置。</p>
+        <p class="auth-story-description">以训练模型理解任务耗时。<br>结合课表与截止时间，为你安排下一步。</p>
         <div class="auth-plan" aria-hidden="true">
           <div class="auth-plan-heading"><span>让计划，跟上生活的节奏</span>${icon('sun')}</div>
           <div class="auth-plan-line"><span class="plan-tick">${icon('check')}</span><div>整理待办<p>把想做的事写下来</p></div><span class="plan-track"></span></div>
@@ -242,10 +266,11 @@ function reportsView() {
   return `${header('回头看看，也是一种前进。','从实际完成记录中，慢慢了解自己的节奏。',btn('导出数据','export','download'))}${statsView()}<div class="report-grid"><section class="panel report-panel"><div class="row between"><h2>本周完成耗时</h2><span class="pill purple">本地记录</span></div><p class="panel-desc">${shortDate(week)} — ${shortDate(plusDays(week,6))} · 记录实际耗时后计入</p><div class="bar-chart">${Array.from({length:7},(_,i)=>{const mins=done.filter(t=>t.completedAt&&dateKey(t.completedAt)===dateKey(plusDays(week,i))).reduce((s,t)=>s+(t.actual||0),0);return `<div class="bar-group"><div class="bar ${mins?'':'pale'}" style="height:${Math.max(2,mins/max*100)}%" title="${DAYS[i]}：${mins} 分钟"></div><label>${DAYS[i]}</label></div>`;}).join('')}</div><div class="row between" style="margin-top:20px"><span class="tiny muted">已记录实际耗时</span><span>${hours(actual)} <small class="muted tiny">小时</small></span></div><p class="report-note">根据已完成任务的实际耗时汇总。完成任务时记录用时，让每一次投入都有迹可循。</p></section><section class="panel report-panel"><h2>认识你的时间</h2><div class="report-line"><span>已完成任务</span><b>${done.length} 项</b></div><div class="report-line"><span>记录实际用时的任务</span><b>${done.filter(t=>t.actual).length} 项</b></div><div class="report-line"><span>实际 / 预计耗时</span><b>${estimated?(actual/estimated).toFixed(2)+' 倍':'暂无记录'}</b></div><div class="report-tip">${done.length<5?'样本还很少，先不急着下结论。完成任务时记录实际用时，让未来的估时更贴近你的节奏。':'留意实际耗时与预计耗时的差距，下次安排同类任务时可以预留更多余量。'}</div><p class="report-note">结合任务类型与实际用时，逐步调整适合自己的计划节奏。</p></section></div>`;
 }
 function settingsView() {
-  return `${header('按你的习惯，调整时序。','先照顾好自己的节奏，再安排任务。')}<div class="settings-grid">${apiSettingsPanel()}<section class="panel settings-panel"><h2>每日可用时间</h2><p>重新安排时，将在这个时间范围内寻找空闲时段，避开固定日程和锁定块。</p><form id="settings-form"><div class="field-grid"><div class="field"><label for="start-hour">开始时间</label><select name="startHour" id="start-hour">${Array.from({length:24},(_,i)=>`<option value="${i}" ${state.settings.startHour===i?'selected':''}>${String(i).padStart(2,'0')}:00</option>`).join('')}</select></div><div class="field"><label for="end-hour">结束时间</label><select name="endHour" id="end-hour">${Array.from({length:24},(_,i)=>`<option value="${i+1}" ${state.settings.endHour===i+1?'selected':''}>${String(i+1).padStart(2,'0')}:00</option>`).join('')}</select></div></div><p class="tiny muted" style="margin-bottom:18px">时区：${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)} · 跟随浏览器</p><button class="btn primary" type="submit">保存可用时间</button></form></section><section class="panel settings-panel"><h2>规划方式</h2><p>用清晰的规则安排时间，让每一次调整都在掌握之中。</p>${[['inbox','通知核对','逐项核对名称、截止时间与预计耗时','确认后应用'],['calendar','时间安排','避开固定日程与锁定时段','30 分钟粒度'],['chart','完成记录','记录实际用时，回顾每一次投入','本机保存']].map(([i,l,d,status])=>`<div class="settings-row"><div class="row">${icon(i)}<div><h3 style="font-size:12px">${l}</h3><p>${d}</p></div></div><span class="pill purple">${status}</span></div>`).join('')}</section><section class="panel settings-panel"><h2>数据管理</h2><p>数据仅保存在当前浏览器。清除浏览器数据可能导致记录丢失，可以导出 JSON 留存。</p><div class="settings-row"><div><h3 style="font-size:12px">导出当前数据</h3><p>包含任务、通知与时间安排</p></div>${btn('导出 JSON','export','download','sm')}</div><div class="settings-row"><div><h3 style="font-size:12px">清空工作空间</h3><p>删除当前浏览器中的任务、通知和安排</p></div>${btn('清空','reset','','sm danger')}</div></section><section class="panel settings-panel"><h2>关于时序</h2><p>ChronoFlow · 个人时间管理</p><div class="source-detail">把纷杂的信息整理成明确的任务，再为每件事找到合适的时间。<br><br>录入通知、核对事项、安排日程、记录完成。让计划跟上你的生活节奏。<br><br>工作空间数据保存在当前浏览器，可随时导出留存。</div></section></div>`;
+  return `${header('按你的习惯，调整时序。','先照顾好自己的节奏，再安排任务。')}<div class="settings-grid">${canvasPanel()}${apiSettingsPanel()}<section class="panel settings-panel"><h2>每日可用时间</h2><p>重新安排时，将在这个时间范围内寻找空闲时段，避开固定日程和锁定块。</p><form id="settings-form"><div class="field-grid"><div class="field"><label for="start-hour">开始时间</label><select name="startHour" id="start-hour">${Array.from({length:24},(_,i)=>`<option value="${i}" ${state.settings.startHour===i?'selected':''}>${String(i).padStart(2,'0')}:00</option>`).join('')}</select></div><div class="field"><label for="end-hour">结束时间</label><select name="endHour" id="end-hour">${Array.from({length:24},(_,i)=>`<option value="${i+1}" ${state.settings.endHour===i+1?'selected':''}>${String(i+1).padStart(2,'0')}:00</option>`).join('')}</select></div></div><p class="tiny muted" style="margin-bottom:18px">时区：${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)} · 跟随浏览器</p><button class="btn primary" type="submit">保存可用时间</button></form></section><section class="panel settings-panel"><h2>规划方式</h2><p>使用本地基础排程，避开课表和锁定时段。训练模型目前仅在Android手机端提供。</p>${[['inbox','通知核对','逐项核对名称、截止时间与预计耗时','确认后应用'],['calendar','时间安排','避开固定日程与锁定时段','30 分钟粒度'],['chart','完成记录','记录实际用时，回顾每一次投入','本机保存']].map(([i,l,d,status])=>`<div class="settings-row"><div class="row">${icon(i)}<div><h3 style="font-size:12px">${l}</h3><p>${d}</p></div></div><span class="pill purple">${status}</span></div>`).join('')}</section><section class="panel settings-panel"><h2>数据管理</h2><p>数据仅保存在当前浏览器。清除浏览器数据可能导致记录丢失，可以导出 JSON 留存。</p><div class="settings-row"><div><h3 style="font-size:12px">导出当前数据</h3><p>包含任务、通知与时间安排</p></div>${btn('导出 JSON','export','download','sm')}</div><div class="settings-row"><div><h3 style="font-size:12px">清空工作空间</h3><p>删除当前浏览器中的任务、通知和安排</p></div>${btn('清空','reset','','sm danger')}</div></section><section class="panel settings-panel"><h2>关于时序</h2><p>ChronoFlow · 个人时间管理</p><div class="source-detail">把纷杂的信息整理成明确的任务，再为每件事找到合适的时间。<br><br>录入通知、核对事项、安排日程、记录完成。让计划跟上你的生活节奏。<br><br>工作空间数据保存在当前浏览器，可随时导出留存。</div></section></div>`;
 }
 function overlaps(start,end,item) {return start<new Date(item.end)&&end>new Date(item.start);}
 function plan() {
+  state.modelPlan=null;
   const now=new Date(),floor=new Date(now);floor.setSeconds(0,0);floor.setMinutes(Math.ceil(floor.getMinutes()/30)*30);
   const protectedBlocks=state.blocks.filter(b=>state.tasks.some(t=>t.id===b.taskId&&!t.done)&&(b.locked||new Date(b.start)<=now));
   const occupied=[...state.events,...protectedBlocks];const blocks=[...protectedBlocks];const risks=[];
@@ -332,7 +357,7 @@ document.addEventListener('click',e=>{
   if(action==='prev-week'||action==='next-week'){week=plusDays(week,action==='prev-week'?-7:7);render();return;}
   if(action==='this-week'){week=monday(new Date());render();return;}
   if(action==='replan'){confirmAction('重新安排未来时间？','会调整未来未锁定的任务块，保留锁定块与已经开始的安排。','confirm-replan');return;}
-  if(action==='confirm-replan'){plan();week=monday(new Date());closeModal();render();toast(state.risks.length?`已重新安排，${state.risks.length} 项任务存在时间缺口`:'未来任务已重新安排');return;}
+  if(action==='confirm-replan'){closeModal();plan();week=monday(new Date());render();toast(state.risks.length?`基础排程已更新，${state.risks.length} 项任务存在时间缺口`:'日程已重新安排');return;}
   if(action.startsWith('filter-')){taskFilter=action.slice(7);render();return;}
   if(action==='clear-search'){searchQuery='';render();return;}
   if(action==='review-notice'||action==='select-notice'){selectedNotice=id;if(view==='inbox')render();else navigate('inbox');return;}
@@ -345,6 +370,7 @@ document.addEventListener('submit',e=>{
   const form=e.target,formId=form.getAttribute('id');if(!formId)return;e.preventDefault();const data=Object.fromEntries(new FormData(form));
   if(formId==='auth-form'){submitAuth(form);return;}
   if(!session)return;
+  if(formId==='canvas-form'){importCanvas(form);return;}
   if(formId==='api-settings-form'){
     try{const saved=saveApiForm(form);render();refreshApiConfig();toast(saved.retained?'接口配置已保存':'配置已应用；刷新后需重新填写密钥');}catch(error){toast(error.message);}return;
   }
@@ -354,7 +380,7 @@ document.addEventListener('submit',e=>{
     const current=state.tasks.find(t=>t.id===data.id),minutes=Number(data.minutes),fields={title:data.title.trim(),course:data.course.trim(),category:data.category,deadline:data.deadline?new Date(data.deadline).toISOString():null,priority:Number(data.priority)};
     if(current&&fields.deadline&&state.blocks.some(b=>b.taskId===current.id&&b.locked&&new Date(b.end)>new Date(fields.deadline))){toast('截止时间早于锁定时间块，请先解锁或调整截止时间');return;}
     if(current){Object.assign(current,fields);if(!current.done){current.remaining=minutes;current.minutes=Math.max(current.minutes,minutes);}}
-    else state.tasks.push({id:uid(),...fields,minutes,remaining:minutes,color:{阅读:'green',复习:'green',背诵:'green'}[data.category]||'purple',done:false});
+    else state.tasks.push({id:uid(),...fields,releasedAt:new Date().toISOString(),minutes,remaining:minutes,color:{阅读:'green',复习:'green',背诵:'green'}[data.category]||'purple',done:false});
     plan();closeModal();render();toast('任务已保存，未来计划已更新');return;
   }
   if(formId==='event-form'){
@@ -376,7 +402,7 @@ document.addEventListener('submit',e=>{
     }else{
       const deadline=new Date(data.deadline).toISOString(),minutes=Number(data.minutes);
       if(n.action==='update'){const t=active().find(t=>t.id===data.target);if(!t){toast('请选择有效的关联任务');return;}if(state.blocks.some(b=>b.taskId===t.id&&b.locked&&new Date(b.end)>new Date(deadline))){toast('新截止时间早于锁定时间块，请先解锁或调整截止时间');return;}Object.assign(t,{title:data.title.trim(),deadline,remaining:minutes,minutes:Math.max(t.minutes,minutes),course:data.course.trim()});}
-      else state.tasks.push({id:uid(),title:data.title.trim(),course:data.course.trim(),category:'其他',minutes,remaining:minutes,deadline,priority:2,color:'purple',done:false});
+      else state.tasks.push({id:uid(),sourceKey:n.sourceKey,releasedAt:n.releasedAt||n.received,title:data.title.trim(),course:data.course.trim(),category:'其他',minutes,remaining:minutes,deadline,priority:2,color:'purple',done:false});
     }
     n.status='applied';plan();render();toast('已确认，任务与日历已更新');return;
   }

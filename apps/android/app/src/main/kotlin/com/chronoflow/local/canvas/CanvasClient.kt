@@ -64,6 +64,7 @@ class CanvasClient {
             body = plain(row.text("description").orEmpty()),
             dueAt = row.instant("due_at"),
             htmlUrl = row.text("html_url").orEmpty(),
+            publishedAt = row.instant("created_at"),
             updatedAt = row.instant("updated_at"),
         )
     }
@@ -79,7 +80,8 @@ class CanvasClient {
             title = title,
             body = plain(row.text("message").orEmpty()),
             htmlUrl = row.text("html_url").orEmpty(),
-            updatedAt = row.instant("posted_at") ?: row.instant("created_at"),
+            publishedAt = row.instant("posted_at") ?: row.instant("created_at"),
+            updatedAt = row.instant("last_reply_at") ?: row.instant("posted_at") ?: row.instant("created_at"),
         )
     }
 
@@ -96,6 +98,7 @@ class CanvasClient {
             startAt = row.instant("start_at"),
             endAt = row.instant("end_at"),
             htmlUrl = row.text("html_url").orEmpty(),
+            publishedAt = row.instant("created_at"),
             updatedAt = row.instant("updated_at") ?: row.instant("created_at"),
         )
     }

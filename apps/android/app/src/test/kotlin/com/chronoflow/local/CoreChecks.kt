@@ -246,6 +246,53 @@ object CoreChecks {
             val state = LocalEngine.ingest(empty.copy(preferences = prefs.copy(autoCreate = true)), incoming("实验三明天18:00提交，预计2小时"), clock)
             check(state.tasks.size == 1 && state.schedule.blocks.isNotEmpty() && state.notices.single().status == NoticeStatus.APPLIED)
         }
+        test("confirmed notification preserves publication time on task") {
+            val published = clock.minusSeconds(1800)
+            val pending = LocalEngine.ingest(empty, incoming("实验三明天18:00提交，预计2小时").copy(receivedAt = published), clock)
+            val notice = pending.notices.single()
+            val applied = LocalEngine.apply(pending, notice.id, notice.proposal, clock)
+            check(applied.tasks.single().releasedAt == published)
+        }
+        test("manual task creation records its release time once") {
+            val draft = Task(title = "手动任务")
+            val created = LocalEngine.saveTask(empty, draft, clock)
+            val edited = LocalEngine.saveTask(created, created.tasks.single().copy(minutes = 90), clock.plusSeconds(600))
+            check(created.tasks.single().releasedAt == clock)
+            check(edited.tasks.single().releasedAt == clock)
+        }
+        test("Canvas publication time becomes task release baseline") {
+            val published = clock.minusSeconds(86400)
+            val item = CanvasItem("assignment:1:10", CanvasItemType.ASSIGNMENT, "机器学习", "实验五",
+                dueAt = clock.plusSeconds(86400), publishedAt = published, updatedAt = clock)
+            val imported = CanvasSyncEngine.merge(empty, listOf(item), clock).state
+            check(imported.notices.single().input.receivedAt == published)
+            val notice = imported.notices.single()
+            val applied = LocalEngine.apply(imported, notice.id, notice.proposal, clock)
+            check(applied.tasks.single().releasedAt == published)
+        }
+        test("completion timing separates total cycle from actual work") {
+            val task = Task(title = "课程报告", status = TaskStatus.COMPLETED, releasedAt = clock,
+                completedAt = clock.plusSeconds(6 * 3600), deadline = clock.plusSeconds(24 * 3600),
+                actualMinutes = 90, originalEstimateMinutes = 120)
+            val timing = CompletionTimingEngine.timing(task)!!
+            check(timing.releaseToCompletionMinutes == 360L)
+            check(timing.nonExecutionGapMinutes == 270L)
+            check(timing.deadlineWindowUsage == .25 && timing.onTime == true && timing.estimateMultiple == 3.0)
+        }
+        test("completion timing summarizes distribution and active age") {
+            val completed = listOf(60L, 600L, 2880L).mapIndexed { index, lead -> Task(
+                title = "报告$index", category = if (index < 2) TaskCategory.REPORT else TaskCategory.PROGRAMMING,
+                status = TaskStatus.COMPLETED, releasedAt = clock, completedAt = clock.plusSeconds(lead * 60),
+                deadline = clock.plusSeconds((if (index == 2) 1440L else 1200L) * 60),
+            ) }
+            val summary = CompletionTimingEngine.summary(completed)!!
+            check(summary.sampleCount == 3 && summary.medianMinutes == 600L && summary.p80Minutes == 1968L)
+            check(kotlin.math.abs(summary.within24HoursRate - 2.0 / 3.0) < .0001)
+            check(summary.onTimeRate == 2.0 / 3.0 && summary.categories.size == 2)
+            val active = Task(title = "仍在进行", releasedAt = clock.minusSeconds(3600))
+            check(CompletionTimingEngine.activeAgeMinutes(active, clock) == 60L)
+            check(CompletionTimingEngine.summary(listOf(Task(title = "旧任务", status = TaskStatus.COMPLETED, completedAt = clock))) == null)
+        }
         test("confirm once; repeated apply rejected") {
             val state = LocalEngine.ingest(empty, incoming("实验三明天提交"), clock)
             val notice = state.notices.single()
