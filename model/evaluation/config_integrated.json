@@ -1,6 +1,7 @@
 {
   "protocol_version": "scheduling-integrated-1",
   "planner_version": 4,
+  "optimizer_revision": 1,
   "online_version": 1,
   "enable_local_repair": false,
   "enable_replan_cooldown": false,
@@ -28,8 +29,8 @@
   "guard_confidence_z": 1.645,
   "bootstrap_samples": 2000,
   "seed": 20261017,
-  "seeds": [11, 23, 47, 83, 131],
-  "methods": ["edf", "global_probability", "drp_full"],
+  "seeds": [11],
+  "methods": ["edf", "priority_edf", "deterministic", "probabilistic", "global_probability", "personalized", "risk_aware", "drp_full"],
   "split": "validation",
   "duration_sigma_prior": 0.35,
   "execution_probability_prior": 0.75

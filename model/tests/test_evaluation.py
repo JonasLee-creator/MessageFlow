@@ -19,7 +19,7 @@ from evaluation.improved_planner import rollout_loss
 
 class EvaluationTests(unittest.TestCase):
     def setUp(self):
-        self.config = json.loads((ROOT/'evaluation/config.json').read_text())
+        self.config = json.loads((ROOT/'evaluation/config_integrated.json').read_text())
         self.config['planning_samples'] = 2
         self.origin = datetime(2026,10,17,8,tzinfo=timezone.utc)
         self.task = Task('a','report','报告','c',3,5,0,0,0,240,60,True)
@@ -118,8 +118,8 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(duration_metrics([],[]),{'n':0})
         self.assertGreater(duration_metrics([(math.log(60),.2)],[60])['crps_minutes'],0)
 
-    def test_v2_preserves_feasibility_and_exposes_candidates(self):
-        config=json.loads((ROOT/'evaluation/config_v2.json').read_text())
+    def test_main_preserves_feasibility_and_exposes_candidates(self):
+        config=json.loads((ROOT/'evaluation/config_integrated.json').read_text())
         config['planning_samples']=2
         row,trace=replay(self.scenario,'drp_full',11,config,Predictor(config))
         self.assertEqual(row['feasible'],1)
@@ -136,7 +136,7 @@ class EvaluationTests(unittest.TestCase):
                       self.config,Predictor(self.config),{},{})
         self.assertEqual(blocks,[Block('a',120,180)])
 
-    def test_v2_nonsplit_reservation_does_not_reuse_progress_after_gap(self):
+    def test_nonsplit_reservation_does_not_reuse_progress_after_gap(self):
         from dataclasses import replace
         task=replace(self.task,splittable=False)
         blocks=build_schedule([task],{'a':30},{},0,480,[(0,120)],[],self.origin,self.config,
@@ -144,10 +144,10 @@ class EvaluationTests(unittest.TestCase):
             'edf',False,{},continuity=True)
         self.assertEqual(blocks,[Block('a',120,180)])
 
-    def test_v2_rollout_resets_nonsplit_progress_after_gap(self):
+    def test_rollout_resets_nonsplit_progress_after_gap(self):
         from dataclasses import replace
         task=replace(self.task,splittable=False,deadline=150)
-        config=json.loads((ROOT/'evaluation/config_v2.json').read_text())
+        config=json.loads((ROOT/'evaluation/config_integrated.json').read_text())
         predictions={'a':(math.log(60),.00001,dict.fromkeys(('morning','afternoon','evening','night'),1.))}
         loss=rollout_loss([Block('a',120,150)],[task],{'a':30},predictions,0,480,self.origin,config,1)
         self.assertGreaterEqual(loss,1.)

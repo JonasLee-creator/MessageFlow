@@ -109,3 +109,15 @@ python scripts\validate_export.py --checkpoint checkpoints\chronoflow_best.pt --
 
 适配器遵循因果时间规则：任务耗时与执行概率都只读取`prediction_at`之前的用户历史；同日负荷只通过预测时已经存在的“此前负荷”字段进入。`UNKNOWN`执行结果输出为`null`并由损失掩码排除。
 
+# 当前交付：V4 主方法
+
+日程规划统一使用 `evaluation/config_integrated.json`（V4 Integrated，revision 1，原在线更新）。默认比较全部7个baseline，种子11；旧实验入口已移除。训练和部署代码继续保留，收尾不重新训练。
+
+```bash
+python -m unittest discover -s tests -v
+python evaluation/run_evaluation.py --checkpoint checkpoints/chronoflow_best.pt --split validation --output evaluation/results/v4-validation
+python evaluation/run_evaluation.py --checkpoint checkpoints/chronoflow_best.pt --split test --output evaluation/results/v4-test
+```
+
+详细指标、数据来源和结论边界见 [评估说明](evaluation/README.md)。完整测试结果继续保存在云端原结果目录；请保留对应manifest、runs和检查点哈希，不能用小规模样例替代正式记录。
+

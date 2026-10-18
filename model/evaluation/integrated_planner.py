@@ -10,8 +10,7 @@ import statistics
 from .improved_planner import improved_plan,rollout_loss
 from .metrics import cvar,disruption,feasibility,mean
 from .predictor import quantile
-from .stable_planner import changed_tasks
-from .incremental_repairs import conditional_total,incremental_candidates
+from .plan_utils import changed_tasks
 
 
 def paired_upper_difference(values,reference,z):
@@ -37,10 +36,9 @@ def passes_guard(candidate,reference,config):
 def integrated_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,control):
     from .planners import build_schedule
     step=config['slot_minutes']
-    upgraded=config.get('optimizer_revision',1)>=2
     old=[b for b in old if b.task_id not in completed and b.end>now]
     # Same state, same online history, original V2 objective and candidate search.
-    baseline_config=dict(config,planner_version=2,enable_local_repair=False,
+    baseline_config=dict(config,enable_local_repair=False,
         enable_replan_cooldown=False,enable_low_gain_rejection=False)
     reference_blocks,reference_detail=improved_plan(tasks,progress,completed,now,horizon,fixed,
         old,origin,baseline_config,predictor,history,used,control={})
@@ -98,14 +96,11 @@ def integrated_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config
     missing={t.id for t in tasks if not any(b.task_id==t.id for b in old)}
     # Pending work is accounted for; no hidden true duration or execution outcome.
     def slack(task):
-        if upgraded:
-            total=conditional_total(*predictions[task.id][:2],progress.get(task.id,0),.8,step)
-        else:
-            total=quantile(*predictions[task.id][:2],.8)
+        total=quantile(*predictions[task.id][:2],.8)
         remaining=max(step,total-progress.get(task.id,0))
         execution=max(.25,mean(probabilities[task.id].values()))
         duration=remaining/execution if task.splittable else remaining
-        earliest=max(now,task.available,task.earliest) if upgraded else now
+        earliest=now
         return (task.deadline if task.deadline is not None else horizon+20160)-earliest-duration
     risk_ids={t.id for t in tasks if t.deadline is not None and now<t.deadline and slack(t)<=config['freeze_minutes']}
     affected=(new_ids|missing|risk_ids|set(control.get('affected',[])))-set(completed)
@@ -115,17 +110,10 @@ def integrated_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config
     if previous_safe:
         safe.append(previous)
     incremental_count=0
-    if upgraded:
-        for name,blocks,stage in incremental_candidates(tasks,progress,completed,now,horizon,
-                fixed,old,origin,config,predictions,used):
-            row=evaluate(name,blocks,stage)
-            if row is not None and passes_guard(row,reference,config):
-                safe.append(row)
-                incremental_count+=1
     # Cooldown never vetoes a required repair. If the old plan fails its audit,
     # scopes expand and the certified V2 fallback is always available.
     tried=[]
-    zero_movement_safe=upgraded and any(r['movement']==0 for r in safe) and not missing and not new_ids
+    zero_movement_safe=False
     if not ((cooldown and previous_safe and not missing and not new_ids) or zero_movement_safe):
         sizes=sorted({min(len(tasks),n) for n in config['repair_scopes']}|{len(tasks)})
         for size in sizes:
@@ -137,10 +125,7 @@ def integrated_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config
                 durations={}
                 for task in tasks:
                     if task.id in local_ids:
-                        if upgraded:
-                            durations[task.id]=conditional_total(*predictions[task.id][:2],progress.get(task.id,0),q,step)
-                        else:
-                            durations[task.id]=max(quantile(*predictions[task.id][:2],q),progress.get(task.id,0)+step)
+                        durations[task.id]=max(quantile(*predictions[task.id][:2],q),progress.get(task.id,0)+step)
                     else:
                         committed=sum(max(0,b.end-max(now,b.start)) for b in retained if b.task_id==task.id)
                         first=min((b.start for b in retained if b.task_id==task.id),default=now)

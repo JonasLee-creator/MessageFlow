@@ -8,8 +8,7 @@ from .domain import uniform
 from .metrics import disruption, feasibility, mean, outcomes
 from .planners import plan
 from .predictor import bucket
-from .online import OnlineHistory
-from .stable_planner import changed_tasks
+from .plan_utils import changed_tasks
 
 
 def replay(scenario,method,seed,config,predictor):
@@ -17,9 +16,6 @@ def replay(scenario,method,seed,config,predictor):
     predictor.cache.clear()
     step = config['slot_minutes']
     progress,completed,first,history,used = {},{},{},{},{}
-    modern_online=config.get('online_version',1)>=2 and method in ('personalized','risk_aware','drp_full')
-    if modern_online:
-        history=OnlineHistory(config)
     control,dirty_tasks={},set()
     old,visible = [],set()
     attempts,events,snapshots = [],[],[]
@@ -70,8 +66,6 @@ def replay(scenario,method,seed,config,predictor):
             replans += 1
         active = next((b for b in old if b.start<=now<b.end and b.task_id not in completed),None)
         if active is None:
-            if modern_online:
-                history.flush(now)
             continue
         task = next(t for t in known if t.id==active.task_id)
         name = bucket(scenario.at(now))
@@ -86,13 +80,8 @@ def replay(scenario,method,seed,config,predictor):
             done_before = 0.
         if success:
             first.setdefault(task.id,now)
-        if modern_online:
-            global_p=predictor.base(task,scenario.origin,now)[2][name]
-            personal_p=predictor.predict(task,scenario.origin,now,history,True)[2][name]
-            history.observe(task.id,name,now,step,success,global_p,personal_p)
-        else:
-            success_count,total = history.get(name,(0,0))
-            history[name] = (success_count+int(success),total+1)
+        success_count,total = history.get(name,(0,0))
+        history[name] = (success_count+int(success),total+1)
         day = scenario.at(now).date().isoformat()
         # Daily capacity is occupied time, including failed attempts.
         used[day] = used.get(day,0)+step
@@ -102,12 +91,8 @@ def replay(scenario,method,seed,config,predictor):
             completed[task.id] = now+round(work)
             if method in ('personalized','risk_aware','drp_full'):
                 mu,_,_ = predictor.base(task,scenario.origin,task.available)
-                if modern_online:
-                    history.flush(now+step)
-                    history.record_duration(progress[task.id],mu,now+step)
-                else:
-                    residuals,count = history.get('_duration',(0.,0))
-                    history['_duration'] = (residuals+math.log(actual[task.id])-mu,count+1)
+                residuals,count = history.get('_duration',(0.,0))
+                history['_duration'] = (residuals+math.log(actual[task.id])-mu,count+1)
             dirty = True
             dirty_tasks.add(task.id)
         if not success:
@@ -116,8 +101,6 @@ def replay(scenario,method,seed,config,predictor):
         attempts.append({'task_id':task.id,'start':now,'end':now+step,'success':success,
                          'work_minutes':work,'truth_probability':p})
         last_task,last_end = (task.id if success else None),now+step
-    if modern_online:
-        history.flush(scenario.horizon)
     for minute in range(0,scenario.horizon,step):
         used.setdefault(scenario.at(minute).date().isoformat(),0)
     result = outcomes(scenario.tasks,completed,first,progress,actual,scenario.horizon)
@@ -132,10 +115,6 @@ def replay(scenario,method,seed,config,predictor):
         'local_repairs':sum(e.get('stage')=='local' for e in events),
         'expanded_repairs':sum(e.get('stage')=='expanded' for e in events),
         'incremental_repairs':sum(e.get('stage')=='incremental' for e in events),
-        'adaptive_low_complexity_decisions':sum(e.get('adaptive_low_complexity',0) for e in events),
-        'adaptive_complex_reference_calls':sum(e.get('adaptive_complex_reference',0) for e in events),
-        'adaptive_simple_selections':sum(e.get('adaptive_simple_selected',0) for e in events),
-        'adaptive_verification_fallbacks':sum(e.get('adaptive_verification_fallback',0) for e in events),
         'reference_plan_selections':sum(e.get('stage')=='reference' for e in events),
         'verification_fallbacks':sum(e.get('verification_fallback',0) for e in events),
         'keep_plan_decisions':sum(e.get('stage')=='keep' for e in events),
@@ -143,7 +122,7 @@ def replay(scenario,method,seed,config,predictor):
         'physical_changed_tasks_per_decision':mean(e['physical_changed_task_count'] for e in events),
         'rejected_low_gain_replans':sum(e.get('rejected_low_gain',0) for e in events),
         'affected_tasks_per_decision':mean(e['affected_task_count'] for e in events if 'affected_task_count' in e),
-        'online_sessions':history.session_count if modern_online else 0,
+        'online_sessions':0,
         'switches':sum(a['task_id']!=b['task_id'] for a,b in zip(attempts,attempts[1:])),
         'daily_load_variance':mean((v-(mean(used.values()) or 0))**2 for v in used.values())})
     task_rows = [{'task_id':t.id,'released':t.released,'deadline':t.deadline,

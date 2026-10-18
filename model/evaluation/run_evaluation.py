@@ -69,7 +69,7 @@ def summarize(rows,alpha):
 def main():
     parser = argparse.ArgumentParser(description='Paired causal scheduling simulation; never trains models.')
     parser.add_argument('--dataset',type=Path,default=ROOT/'dataset')
-    parser.add_argument('--config',type=Path,default=ROOT/'evaluation/config.json')
+    parser.add_argument('--config',type=Path,default=ROOT/'evaluation/config_integrated.json')
     parser.add_argument('--checkpoint',type=Path)
     parser.add_argument('--model-config',type=Path,default=ROOT/'config/base.json')
     parser.add_argument('--output',type=Path,required=True,help='Must not exist: prevents overwriting experiments')
@@ -78,29 +78,15 @@ def main():
     parser.add_argument('--seeds',type=int,nargs='+')
     parser.add_argument('--methods',choices=METHODS,nargs='+')
     parser.add_argument('--save-traces',action='store_true')
-    parser.add_argument('--local-repair',choices=('on','off'))
-    parser.add_argument('--replan-cooldown',choices=('on','off'))
-    parser.add_argument('--low-gain-rejection',choices=('on','off'))
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding='utf-8'))
-    for argument,key in (('local_repair','enable_local_repair'),
-                         ('replan_cooldown','enable_replan_cooldown'),
-                         ('low_gain_rejection','enable_low_gain_rejection')):
-        value=getattr(args,argument)
-        if value is not None:
-            config[key]=value=='on'
     switches=('enable_local_repair','enable_replan_cooldown','enable_low_gain_rejection')
     if any(k in config and not isinstance(config[k],bool) for k in switches):
         parser.error('planner switches must be JSON booleans')
     if any(config.get(k,False) for k in switches):
-        if config.get('planner_version',1)<2:
-            parser.error('planner switches require planner_version 2 or 3')
-        defaults=json.loads((ROOT/'evaluation/config_v3.json').read_text(encoding='utf-8'))
-        for key in ('local_max_affected_tasks','urgent_deadline_minutes',
-                    'global_replan_cooldown_minutes','minimum_replan_gain'):
-            config.setdefault(key,defaults[key])
-        if config['local_max_affected_tasks']<1 or config['global_replan_cooldown_minutes']<0 or config['minimum_replan_gain']<0:
-            parser.error('invalid planner control parameters')
+        parser.error('retired experimental switches are not supported in the V4 release')
+    if config.get('planner_version')!=4 or config.get('optimizer_revision',1)!=1 or config.get('online_version',1)!=1:
+        parser.error('use the V4 main configuration: config_integrated.json')
     for key in ('split','seeds','methods'):
         if getattr(args,key) is not None:
             config[key] = getattr(args,key)
@@ -112,26 +98,12 @@ def main():
         parser.error('invalid bootstrap_samples/cvar_alpha')
     if not config['methods'] or any(m not in METHODS for m in config['methods']):
         parser.error('unknown/empty methods')
-    if config.get('planner_version',1) in (4,5):
+    if config.get('planner_version',1)==4:
         if config['planning_samples']<2 or not config['repair_scopes'] or any(n<1 for n in config['repair_scopes']):
             parser.error('integrated planner requires >=2 samples and positive repair scopes')
         for key in ('guard_mean_tolerance','guard_completion_tolerance','guard_tail_tolerance','guard_response_tolerance','guard_confidence_z'):
             if config[key]<0:
                 parser.error(f'{key} must be nonnegative')
-    if config.get('planner_version',1)==5:
-        from evaluation.adaptive_planner import validate_config
-        try:
-            validate_config(config)
-        except ValueError as exc:
-            parser.error(str(exc))
-    if config.get('online_version',1)>=2:
-        if config['planning_samples']<2 or config['local_max_affected_tasks']<1:
-            parser.error('V3 requires >=2 planning samples and >=1 local affected task')
-        for key in ('online_half_life_minutes','online_prior_strength','online_trust_sessions','online_duration_prior'):
-            if config[key]<=0:
-                parser.error(f'{key} must be positive')
-        if not 0<=config['online_error_forgetting']<1:
-            parser.error('online_error_forgetting must be in [0,1)')
     predictor = Predictor(config,args.checkpoint,args.model_config)
     source = args.dataset/'scenario_instances.jsonl'
     scenarios = list(load_scenarios(source,config['split']))

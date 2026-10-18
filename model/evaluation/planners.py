@@ -132,22 +132,12 @@ def plan(method,tasks,progress,completed,now,horizon,fixed,old,origin,config,pre
     tasks = [t for t in tasks if t.id not in completed]
     if not tasks:
         return [],{}
-    if method=='drp_full' and config.get('planner_version',1)==5:
-        from .adaptive_planner import adaptive_plan
-        return adaptive_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,
-                             control if control is not None else {})
-    if method=='drp_full' and config.get('planner_version',1)==4:
+    if method=='drp_full':
+        if config.get('planner_version',4)!=4 or config.get('optimizer_revision',1)!=1 or config.get('online_version',1)!=1:
+            raise ValueError('This release supports only the V4 main planner (revision 1, online 1)')
         from .integrated_planner import integrated_plan
         return integrated_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,
                                control if control is not None else {})
-    if method=='drp_full' and config.get('planner_version',1)>=3:
-        from .stable_planner import stable_plan
-        return stable_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,
-                           control if control is not None else {})
-    if method=='drp_full' and config.get('planner_version',1)>=2:
-        from .improved_planner import improved_plan
-        return improved_plan(tasks,progress,completed,now,horizon,fixed,old,origin,config,predictor,history,used,
-                             control=control)
     personal = method in ('personalized','risk_aware','drp_full')
     if method in ('edf','priority_edf'):
         predictions = {t.id:(math.log(t.estimate),config['duration_sigma_prior'],
