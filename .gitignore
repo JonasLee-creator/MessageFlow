@@ -25,3 +25,11 @@ captures/
 *.jks
 key.properties
 flutter-releases.json
+
+# Local previews, build deliveries and duplicate collaboration packages.
+# Maintained technical documents and their resources live in docs/.
+/tmp/
+/output/
+/AIC-2026-35074703-AI+软件创新-时序ChronoFlow/
+/技术方案配图-统一重绘版/
+/时序-技术方案-协作编辑包/

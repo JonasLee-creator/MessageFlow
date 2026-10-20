@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.chronoflow.local.CompletionTimingTextTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-18T14:55:58" hostname="JONAS的笔记本" time="0.012">
+  <properties/>
+  <testcase name="completedTaskWithDeadlineCanRenderTodaySummary" classname="com.chronoflow.local.CompletionTimingTextTest" time="0.01"/>
+  <testcase name="percentageAndLiteralThresholdRenderWithoutFormatExceptions" classname="com.chronoflow.local.CompletionTimingTextTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

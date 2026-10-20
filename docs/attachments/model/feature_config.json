@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "model_version": "0.1.0",
+  "seed": 20261017,
+  "features": {
+    "hash_dim": 2048,
+    "ngram_min": 2,
+    "ngram_max": 3,
+    "category_count": 8,
+    "category_embedding_dim": 16,
+    "course_hash_buckets": 512,
+    "course_embedding_dim": 16,
+    "numeric_feature_dim": 16,
+    "user_state_dim": 12,
+    "slot_feature_dim": 12
+  },
+  "network": {
+    "hash_projection_dim": 128,
+    "encoder_hidden_dims": [256, 64],
+    "task_embedding_dim": 32,
+    "head_hidden_dim": 64,
+    "dropout": 0.1,
+    "minimum_sigma": 0.08,
+    "maximum_sigma": 2.0
+  },
+  "training": {
+    "batch_size": 64,
+    "epochs": 80,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "duration_loss_weight": 1.0,
+    "execution_loss_weight": 1.0,
+    "early_stopping_patience": 10
+  },
+  "planning": {
+    "slot_minutes": 30,
+    "horizon_days": 14,
+    "freeze_minutes": 120,
+    "scenario_count": 64,
+    "cvar_alpha": 0.9
+  }
+}

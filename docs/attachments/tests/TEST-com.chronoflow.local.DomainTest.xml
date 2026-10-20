@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.chronoflow.local.DomainTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-18T14:55:58" hostname="JONAS的笔记本" time="0.282">
+  <properties/>
+  <testcase name="localDomainRegression" classname="com.chronoflow.local.DomainTest" time="0.282"/>
+  <system-out><![CDATA[PASS explicit task deadline and duration are local auto-safe
+PASS date-only deadline always needs review
+PASS Chinese PM event range
+PASS time range is not misread as month-day
+PASS explicit ISO date
+PASS invalid date does not crash or invent deadline
+PASS unknown date stays null
+PASS ambiguous Chinese clock hour is never automatic
+PASS truncated notification requires review
+PASS invalid clock does not turn into a fabricated deadline
+PASS ordinary conversation ignored
+PASS postponement takes precedence over no-submit wording
+PASS similar lab numbers do not match
+PASS group matching prevents cross-class mutation
+PASS source matching prevents same-name QQ group mutating WeChat
+PASS ambiguous task target requires selection
+PASS event cancellation finds existing class
+PASS missing event end requires review
+PASS overnight event not silently inverted
+PASS WeChat exact whitelist
+PASS QQ unread and sender group title
+PASS disabled and unlisted notifications filtered
+PASS matching summary accepted; individual MessagingStyle messages preserved
+PASS WeChat group can be identified from subtext or body prefix
+PASS conversation title wins when sender shown in title
+PASS irrelevant group chatter filtered
+PASS replayed legacy notification deduped for ten minutes
+PASS default ingestion does not change tasks before confirmation
+PASS Canvas assignment enters review with structured deadline
+PASS unchanged Canvas records do not create duplicates
+PASS Canvas deadline change updates the confirmed task through review
+PASS pending Canvas update replaces its earlier review card
+PASS AI multi-item analysis creates separate review cards
+PASS AI decomposition is preserved when task is confirmed
+PASS local uncertainty decomposes confidence and allows only complete creation
+PASS uncertainty blocks conflicting actions and asks at most two useful questions
+PASS missing update target becomes a blocking field
+PASS personal duration learning uses completed actual samples
+PASS personal model learns a conservative category duration multiplier
+PASS personal model learns preferred time buckets from execution outcomes
+PASS execution feedback reduces remaining work and survives replanning input
+PASS local intelligence flags learned underestimation and repeated deadline changes
+PASS explicit auto-create preference creates and schedules
+PASS confirmed notification preserves publication time on task
+PASS manual task creation records its release time once
+PASS Canvas publication time becomes task release baseline
+PASS completion timing separates total cycle from actual work
+PASS completion timing summarizes distribution and active age
+PASS confirm once; repeated apply rejected
+PASS deadline lock and absent deadline preserve existing date
+PASS missing update target never creates a new task
+PASS cancellation removes future blocks
+PASS fixed event avoided; deadline end boundary honored
+PASS unsplittable task is not divided around a meeting
+PASS locked time preserved and subtracted from remaining
+PASS past deadline gives risk and no illegal block
+PASS completed task never gets new time
+PASS locked event collision explicitly reported
+PASS slot rounding never starts in past
+PASS same semantic reminder is not repeated after replan
+PASS disabled or stale reminders suppressed
+PASS randomized 100 schedules preserve collision and deadline invariants
+62 core checks passed (including 100 randomized scheduling cases)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

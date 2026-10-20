@@ -1,0 +1,66 @@
+[
+  {
+    "file": "figures/F01-architecture.png",
+    "pixels": [
+      1852,
+      849
+    ],
+    "sha256": "33da17cf0ed72ef0b9bc0984bc835c1244bfd3e542e47f7d664df42b62a728ae"
+  },
+  {
+    "file": "figures/drp-main-p1.png",
+    "pixels": [
+      1586,
+      992
+    ],
+    "sha256": "c787143895c252d3bf8104acafd71b9e2745312bc55be35b8f19c11effdb0d53"
+  },
+  {
+    "file": "figures/F04-quantiles.png",
+    "pixels": [
+      1983,
+      793
+    ],
+    "sha256": "2a3d75702040e3447755b18d524788a31facd4914484ee99c7689ac660a93a08"
+  },
+  {
+    "file": "figures/F05-posterior.png",
+    "pixels": [
+      1983,
+      793
+    ],
+    "sha256": "21b74e73154fd312ca3dc84d8b7b09ad0c8aee7b5ab8c16cadda5830a8e7a304"
+  },
+  {
+    "file": "figures/F06-cvar.png",
+    "pixels": [
+      1983,
+      793
+    ],
+    "sha256": "b216843fa7412aa903990d507e5ad0c16b95b5fe5797f5d56ffe485cdd6f39ed"
+  },
+  {
+    "file": "figures/F07-search.png",
+    "pixels": [
+      1983,
+      793
+    ],
+    "sha256": "11ed59125ecd941b052f78cfd49a09a805c81659119f0a006d1b6a01761adb54"
+  },
+  {
+    "file": "figures/F02-sources.png",
+    "pixels": [
+      1983,
+      793
+    ],
+    "sha256": "46c82dcd62cfb922e46687ba556d3d568bbc5ac0132d493b8eacc4df0f57a1be"
+  },
+  {
+    "file": "figures/eval-replay-chart.png",
+    "pixels": [
+      3000,
+      1430
+    ],
+    "sha256": "2b0613efc38dc0e4ee1548abe392efedacc3e45370a36af881d501ca8f6c738b"
+  }
+]

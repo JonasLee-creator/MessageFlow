@@ -1,0 +1,194 @@
+{
+  "status": "PASS",
+  "schema": "drp-sim-v1.3",
+  "simulated": true,
+  "counts": {
+    "users": 60,
+    "tasks": 5099,
+    "duration_labels": 4135,
+    "blocks": 23053,
+    "user_days": 1680,
+    "release_completion": 5099,
+    "pareto_choices": 1678,
+    "plan_snapshots": 1678,
+    "replans": 721,
+    "fixed_intervals": 3586,
+    "scenarios": 10000,
+    "scenario_instances": 2000
+  },
+  "checksum_mismatches": [],
+  "generator": {
+    "declared": "evaluation/generate_drp_sim_v1.py",
+    "resolved": "D:\\Lecture Resources\\AIC\\model\\dataset\\generate_drp_sim_v1.py",
+    "exists": true
+  },
+  "non_simulation_roles": {},
+  "duplicate_ids": {
+    "users": 0,
+    "tasks": 0,
+    "blocks": 0,
+    "pareto_choices": 0,
+    "plan_snapshots": 0,
+    "replans": 0,
+    "fixed_intervals": 0,
+    "scenarios": 0,
+    "scenario_instances": 0
+  },
+  "task_counts_by_split": {
+    "train": 3603,
+    "test": 759,
+    "val": 737
+  },
+  "task_categories": {
+    "实验": 718,
+    "考试准备": 617,
+    "复习": 718,
+    "报告": 714,
+    "编程": 823,
+    "阅读": 490,
+    "背诵": 387,
+    "其他": 632
+  },
+  "tasks_per_user": {
+    "minimum": 70,
+    "median": 85,
+    "maximum": 96
+  },
+  "unique_sanitized_titles": 5094,
+  "duplicate_title_rows": 5,
+  "semantic_holdout": {
+    "families": 30,
+    "tasks": 753,
+    "family_overlap_with_encoder_train": 0
+  },
+  "causal_violations": {
+    "task_prediction_before_release": 0,
+    "duration_prediction_before_release": 0,
+    "blocks_planned_before_task_release": 0
+  },
+  "duration_examples_by_category": {
+    "实验": 575,
+    "复习": 565,
+    "考试准备": 514,
+    "编程": 681,
+    "背诵": 313,
+    "报告": 573,
+    "其他": 511,
+    "阅读": 403
+  },
+  "block_outcomes": {
+    "None": 15438,
+    "COMPLETED": 3691,
+    "PARTIALLY_COMPLETED": 1259,
+    "UNKNOWN": 1090,
+    "DELAYED": 851,
+    "SKIPPED": 724
+  },
+  "selected_block_outcomes": {
+    "COMPLETED": 3691,
+    "PARTIALLY_COMPLETED": 1259,
+    "UNKNOWN": 1090,
+    "DELAYED": 851,
+    "SKIPPED": 724
+  },
+  "block_time_buckets": {
+    "morning": 9689,
+    "afternoon": 7916,
+    "evening": 4886,
+    "night": 562
+  },
+  "block_freeze_kinds": {
+    "NONE": 18389,
+    "USER_LOCK": 1549,
+    "SYSTEM_FREEZE": 2526,
+    "MANUAL_OVERRIDE": 589
+  },
+  "selected_block_errors": {},
+  "counterfactual_blocks": {
+    "observed_labels": 0,
+    "with_actual_values": 0
+  },
+  "known_negative_feedback_rate": 0.2414,
+  "completion_cycles": {
+    "completed": 4135,
+    "censored": 964
+  },
+  "pareto": {
+    "selections": {
+      "compact": 634,
+      "balanced": 552,
+      "steady": 492
+    },
+    "identical_candidate_block_sets": 0,
+    "empty_candidate_groups": 0,
+    "decision_sets_with_dominance": 0,
+    "dominated_candidates": 0,
+    "dominated_candidates_by_plan": {}
+  },
+  "plan_snapshots": {
+    "selected_block_references": 7615,
+    "schedule_version_mismatches": 0,
+    "fixed_interval_overlap_references": 0,
+    "affected_snapshots": 0
+  },
+  "replan_reasons": {
+    "USER_REQUESTED": 118,
+    "TASK_OVERRUN": 130,
+    "BLOCK_SKIPPED": 120,
+    "FIXED_EVENT_ADDED": 131,
+    "NEW_TASK": 112,
+    "DEADLINE_CHANGED": 110
+  },
+  "locked_blocks_moved": 0,
+  "scenario_stress_types": {
+    "p95_duration": 1669,
+    "double_skip": 1668,
+    "class_extend": 1673,
+    "evening_drop": 1652,
+    "new_urgent": 1655,
+    "normal": 1683
+  },
+  "missing_rates": {
+    "users": {},
+    "tasks": {
+      "deadline_at": 0.1836
+    },
+    "duration_labels": {},
+    "blocks": {
+      "actual_end": 0.7484,
+      "actual_minutes": 0.7484,
+      "actual_start": 0.7484,
+      "deadline_distance_minutes": 0.1834,
+      "label_executed": 0.717,
+      "label_failed_feedback": 0.717,
+      "outcome": 0.6697
+    },
+    "user_days": {
+      "average_estimation_error": 0.0298,
+      "average_start_delay": 0.0298
+    },
+    "release_completion": {
+      "actual_work_minutes": 0.1891,
+      "completed_at": 0.1891,
+      "deadline_at": 0.1836,
+      "deadline_window_usage": 0.3371,
+      "first_actual_start_at": 0.1891,
+      "non_execution_gap_minutes": 0.1891,
+      "release_to_completion_minutes": 0.1891,
+      "release_to_first_start_minutes": 0.1891
+    },
+    "pareto_choices": {},
+    "plan_snapshots": {},
+    "replans": {},
+    "fixed_intervals": {},
+    "scenarios": {},
+    "scenario_instances": {}
+  },
+  "errors": [],
+  "warnings": [
+    "93 replans are reverted with accepted=false; document whether this means rejection",
+    "declared generator path is missing; using bundled copy generate_drp_sim_v1.py",
+    "fixed_intervals has no known_at; causal availability of newly added events cannot be audited",
+    "sim_* fields are generator ground truth and must be excluded from predictor inputs"
+  ]
+}

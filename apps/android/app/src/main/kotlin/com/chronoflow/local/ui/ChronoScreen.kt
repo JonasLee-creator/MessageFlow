@@ -215,7 +215,7 @@ private fun entries(state: LocalState, date: LocalDate): List<Entry> {
                     Column { Text("%.0f%%".format(completionSummary.within24HoursRate * 100), fontWeight = FontWeight.Bold); Text("24小时内完成", style = MaterialTheme.typography.labelSmall, color = Muted) }
                 }
                 completionSummary.onTimeRate?.let { Text("按时完成率 %.0f%%".format(it * 100), color = Teal, style = MaterialTheme.typography.bodySmall) }
-                completionSummary.medianDeadlineWindowUsage?.let { Text("中位截止窗口使用率 %.0f%%；超过 100% 表示完成时已逾期。".format(it * 100), style = MaterialTheme.typography.bodySmall, color = Muted) }
+                completionSummary.medianDeadlineWindowUsage?.let { Text(formatDeadlineWindowUsage(it), style = MaterialTheme.typography.bodySmall, color = Muted) }
                 completionSummary.categories.take(3).forEach { category ->
                     Text("${category.category.label} · ${category.sampleCount} 项 · 中位 ${formatElapsed(category.medianMinutes)} · P80 ${formatElapsed(category.p80Minutes)}",
                         style = MaterialTheme.typography.bodySmall)

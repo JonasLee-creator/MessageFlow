@@ -2,131 +2,173 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<title>时序 · 课程群日程助手 — 技术方案</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="时序 ChronoFlow 智能学习日程规划技术方案：端侧概率预测、在线个性化与风险感知滚动规划。" />
+<title>时序 · ChronoFlow — 技术方案</title>
 <style>
-  @page {
-    size: A4;
-    margin: 15mm 16mm 16mm;
-    @bottom-left {
-      content: "时序 · 课程群日程助手 · 技术方案";
-      font-family: "Microsoft YaHei", sans-serif;
-      font-size: 8pt;
-      color: #8b95a1;
-    }
-    @bottom-right {
-      content: counter(page);
-      font-family: "Microsoft YaHei", sans-serif;
-      font-size: 8pt;
-      color: #8b95a1;
-    }
-  }
-  @page:first {
-    margin: 0;
-    @bottom-left { content: none; }
-    @bottom-right { content: none; }
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-  body {
-    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
-    color: #1c2430;
-    font-size: 10.6pt;
-    line-height: 1.65;
-    background: white;
-  }
-  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; margin: 0; }
-  p { margin: 0 0 8px; }
-  .cover {
-    width: 210mm;
-    height: 297mm;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    page-break-after: always;
-    background:
-      linear-gradient(165deg, #143042 0%, #1e4d63 56%, #c46a3a 56.15%, #c46a3a 100%);
-    color: white;
-    margin: 0;
-    padding: 24mm 18mm 18mm;
-  }
-  .kicker { letter-spacing: 0.22em; font-size: 11pt; opacity: 0.85; }
-  .cover h1 { font-size: 36pt; margin-top: 18mm; letter-spacing: 0.04em; }
-  .cover .sub { font-size: 16pt; margin-top: 6mm; font-weight: 400; }
-  .cover .meta { margin-top: auto; font-size: 11pt; line-height: 1.9; }
-  .cover .meta b { font-weight: 700; }
-  h2 {
-    font-size: 15pt;
-    color: #143042;
-    border-left: 5px solid #c46a3a;
-    padding-left: 8px;
-    margin: 16px 0 10px;
-    page-break-after: avoid;
-  }
-  h3 { font-size: 12.5pt; color: #1e4d63; margin: 12px 0 6px; page-break-after: avoid; }
-  h4 { font-size: 11pt; margin: 8px 0 4px; }
-  table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 9.2pt; page-break-inside: avoid; }
-  th { background: #143042; color: white; text-align: left; padding: 5px 6px; font-weight: 600; }
-  td { border-bottom: 1px solid #e4e0d8; padding: 4px 6px; vertical-align: top; }
-  tr:nth-child(even) td { background: #f7f4ee; }
-  .num { text-align: right; font-variant-numeric: tabular-nums; }
-  .note { font-size: 9pt; color: #5c6770; }
-  .callout {
-    background: #f4efe6;
-    border-left: 4px solid #1e4d63;
-    padding: 8px 10px;
-    margin: 8px 0 12px;
-    page-break-inside: avoid;
-  }
-  .sim {
-    background: #fff6e8;
-    border: 1.5px dashed #c46a3a;
-    padding: 8px 10px;
-    margin: 8px 0 12px;
-    page-break-inside: avoid;
-  }
-  .sim strong { color: #9a3d12; }
-  .shot {
-    border: 1.5px dashed #8aa0ad;
-    background: #f3f7f9;
-    min-height: 48mm;
-    margin: 8px 0 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #5c7380;
-    text-align: center;
-    page-break-inside: avoid;
-    padding: 8px;
-  }
-  .cap { font-size: 9pt; color: #5c6770; margin: 0 0 10px; }
-  ul { margin: 4px 0 8px; padding-left: 1.2em; }
-  li { margin: 2px 0; }
-  .bars { margin: 8px 0 12px; page-break-inside: avoid; }
-  .bar-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 9.2pt; }
-  .bar-name { width: 96px; flex: none; }
-  .track { flex: 1; background: #ece7df; height: 8px; border-radius: 4px; overflow: hidden; }
-  .fill { height: 100%; background: #1e4d63; }
-  .fill.alt { background: #c46a3a; }
-  .bar-val { width: 42px; text-align: right; }
-  .twocol { display: flex; gap: 10px; }
-  .twocol > div { flex: 1; }
-  .footer-note { margin-top: 14px; font-size: 8.5pt; color: #6b7280; }
-  code { font-family: Consolas, "Sarasa Mono SC", monospace; font-size: 9pt; background: #f3f1ec; padding: 0 3px; white-space: nowrap; }
-  .flow {
-    border: 1.5px dashed #c46a3a;
-    background: #fff8f3;
-    min-height: 188mm;
-    margin: 8px 0 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: #9a3d12;
-    page-break-inside: avoid;
-    padding: 12px;
-  }
-  .toc td { background: transparent !important; border-bottom: 1px dotted #d5d0c6; }
-  h2.part { page-break-before: always; }
+
+@page { size:A4; margin:18mm 17mm 18mm;
+ @bottom-left { content:"时序 · ChronoFlow"; font-family:"Microsoft YaHei",sans-serif; font-size:8pt; color:#708084; }
+ @bottom-right { content:counter(page); font-family:"Cambria",serif; font-size:9pt; color:#708084; }
+}
+@page:first { margin:0; @bottom-left { content:none; } @bottom-right { content:none; } }
+:root { --ink:#203038; --heading:#183d45; --accent:#2e6c72; --muted:#68787d; --rule:#dce5e5; --wash:#f3f7f7; --paper:#fff; }
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { margin:0; color:var(--ink); background:#eaf0f0; font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif; font-size:11pt; font-weight:400; line-height:1.95; -webkit-font-smoothing:antialiased; }
+main { background:var(--paper); }
+h1,h2,h3,h4 { font-weight:700; line-height:1.5; break-after:avoid; page-break-after:avoid; }
+h2 { margin:45px 0 23px; color:var(--heading); font-size:21pt; letter-spacing:.025em; }
+h2:first-child { margin-top:0; }
+h2.part { margin-top:66px; padding-top:31px; border-top:2px solid var(--heading); }
+h3 { color:var(--heading); margin:30px 0 14px; font-size:14pt; }
+h4 { color:var(--accent); margin:23px 0 11px; font-size:11.5pt; }
+h2,h3,h4 { scroll-margin-top:32px; }
+p { margin:0 0 16px; text-align:justify; text-justify:inter-ideograph; overflow-wrap:break-word; }
+p,li { orphans:3; widows:3; }
+ul,ol { margin:15px 0 22px; padding-left:1.65em; }
+li { margin:10px 0; padding-left:3px; }
+li::marker { color:var(--accent); font-weight:600; }
+li b { color:var(--heading); }
+a { color:var(--accent); text-decoration:none; border-bottom:1px solid #c3d6d8; overflow-wrap:anywhere; }
+a:hover { color:#173c44; border-color:var(--accent); }
+sup,sub { font-size:.75em; line-height:0; }
+.cover { width:100%; height:970px; padding:76px 76px 58px; color:#fff; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(180deg,#153d49 0%,#153d49 70%,#f1f4ef 70%,#f1f4ef 100%); break-after:page; page-break-after:always; position:relative; }
+.cover::before { content:""; display:block; position:absolute; top:48px; left:76px; width:44px; height:3px; background:#92b8ae; }
+.kicker { color:#c3d8d7; font-size:10.5pt; letter-spacing:.15em; margin-bottom:67px; }
+.cover h1 { font-size:70pt; line-height:1.2; margin:0 0 32px; letter-spacing:.14em; font-weight:700; }
+.cover .sub { color:#dfeceb; font-size:21pt; line-height:1.9; font-weight:400; letter-spacing:.03em; }
+.cover .meta { margin-top:auto; color:#365157; font-size:10.3pt; line-height:2.1; border-top:1px solid #cbd8d2; padding-top:21px; }
+.frontmatter { padding-bottom:9px; }
+#contents { font-size:22pt; margin-bottom:24px; }
+#abstract { margin-top:44px; font-size:16pt; }
+.toc { margin:0 0 28px; font-size:10pt; border-top:1px solid var(--rule); }
+.toc tbody { background:transparent; }
+.toc tr td { background:transparent !important; border-bottom:1px solid var(--rule); padding:12px 0; }
+.toc td:first-child { width:53%; font-size:13pt; font-weight:600; line-height:1.65; padding-right:22px; color:var(--heading); }
+.toc td:last-child { color:var(--muted); font-size:9.7pt; line-height:1.7; vertical-align:middle; }
+.toc a { display:block; border:0; color:inherit; }
+table { width:100%; border-collapse:collapse; font-size:9.4pt; line-height:1.75; margin:23px 0 27px; table-layout:fixed; border-top:1.4px solid #3c6268; border-bottom:1px solid #a8bdbf; break-inside:auto; }
+caption { caption-side:top; text-align:left; font-size:10pt; color:var(--heading); font-weight:600; letter-spacing:.01em; margin:0 0 10px; line-height:1.6; break-after:avoid; }
+thead { display:table-header-group; }
+tbody { display:table-row-group; }
+tr { break-inside:avoid; page-break-inside:avoid; }
+th,td { vertical-align:top; padding:9px 10px; text-align:left; overflow-wrap:break-word; word-break:normal; border-bottom:1px solid var(--rule); }
+th,table.soft th,table.brand th,table.line th { background:#eaf1f1; color:#244c54; font-weight:600; border-bottom:1px solid #c4d3d5; }
+td:first-child { color:#31545b; font-weight:500; }
+tbody tr:last-child td { border-bottom:0; }
+tbody tr:nth-child(even) td { background:#f8fafa; }
+.cols-2 th:first-child,.cols-2 td:first-child { width:28%; }
+.cols-3 th:first-child,.cols-3 td:first-child { width:23%; }
+.cols-3 th:nth-child(2),.cols-3 td:nth-child(2) { width:37%; }
+.metric { font-size:9.1pt; font-variant-numeric:tabular-nums; }
+.metric th,.metric td { text-align:center; padding:9px 6px; }
+.metric th:first-child,.metric td:first-child { text-align:left; width:25%; }
+.metric tr.hl td { background:#e9f2ef !important; color:#1d5a50; font-weight:700; border-top:1px solid #c8ddd6; }
+.better { color:#1d5a50; font-weight:700; }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+.test-results th:first-child,.test-results td:first-child { width:41%; }
+.test-results th:last-child,.test-results td:last-child { width:26%; }
+.test-results td { font-size:8.4pt; overflow-wrap:anywhere; }
+.note,.cap,figcaption { color:var(--muted); font-size:9pt; line-height:1.75; }
+.cap { margin:9px 0 24px; text-align:left; break-before:avoid; }
+.note { margin-top:8px; }
+.callout { margin:20px 0; padding:14px 17px; background:var(--wash); border-left:2px solid #8cabae; font-size:9.5pt; line-height:1.85; }
+code { font:9pt/1.7 Consolas,"Microsoft YaHei",monospace; color:#355964; background:#eff4f4; padding:1px 4px; border-radius:2px; overflow-wrap:anywhere; word-break:break-word; white-space:normal; }
+pre { margin:18px 0 9px; padding:18px 21px; background:#f3f6f7; border:1px solid #e0e8e9; border-radius:4px; white-space:pre-wrap; overflow-wrap:anywhere; font:9pt/1.7 Consolas,"Microsoft YaHei",monospace; color:#294a56; tab-size:4; }
+pre code { font:inherit; line-height:inherit; padding:0; background:none; white-space:pre-wrap; }
+.diagram,.diagram-page,.phone,.wide-shot { margin:25px 0 7px; text-align:center; break-inside:avoid; page-break-inside:avoid; }
+.diagram img,.diagram-page img { display:block; width:100%; height:auto; object-fit:contain; }
+.diagram img { max-height:100mm; }
+.diagram-page img { max-height:130mm; }
+.phone { padding:25px; background:#f6f9f9; border:1px solid #e5ecec; border-radius:5px; }
+.phone img { width:auto; max-width:100%; max-height:530px; border:1px solid #dae4e4; border-radius:6px; }
+.phones { display:flex; justify-content:center; gap:22px; flex-wrap:wrap; margin:23px 0 8px; break-inside:avoid; }
+.phones figure { margin:0; flex:1 1 43%; max-width:48%; padding:17px 14px 12px; background:#f6f9f9; border:1px solid #e5ecec; border-radius:5px; text-align:center; }
+.phones img { display:block; width:auto; max-width:100%; max-height:470px; margin:auto; border:1px solid #dce5e5; border-radius:4px; }
+.phones figcaption { margin:11px 0 0; font-size:8.7pt; }
+.wide-shot img { width:100%; height:auto; border:1px solid #dce5e5; border-radius:4px; }
+.keep-block { break-inside:auto; }
+math { font-family:"Cambria Math","STIX Two Math","Latin Modern Math",serif; font-size:1.1em; font-weight:400; color:#244650; }
+.equation { margin:19px 0 23px; padding:16px 12px; background:#f7f9f9; border-top:1px solid #e4ecec; border-bottom:1px solid #e4ecec; text-align:center; break-inside:avoid; page-break-inside:avoid; }
+.equation math { margin:4px auto; font-size:13pt; }
+.equation math + math { margin-top:14px; }
+.math-inline { font-family:"Cambria Math","STIX Two Math",serif; font-size:1.1em; }
+.refs { padding-left:1.7em; }
+.refs li { color:#52696f; font-size:9pt; line-height:1.8; margin-bottom:11px; }
+.footer-note { margin:38px 0 0; padding-top:18px; border-top:1px solid var(--rule); text-align:center; color:#7d8c8e; font-size:8.5pt; letter-spacing:.08em; }
+@media screen {
+ .cover,main { width:min(100% - 48px,980px); margin:30px auto; box-shadow:0 8px 35px #153d490c; }
+ main { padding:62px 72px 52px; border:1px solid #dce6e5; }
+}
+@media screen and (max-width:760px) {
+ body { font-size:10.5pt; line-height:1.9; }
+ .cover,main { width:100%; margin:0; box-shadow:none; }
+ .cover { height:820px; padding:64px 30px 38px; }
+ .cover::before { left:30px; }
+ .cover h1 { font-size:56pt; }
+ .cover .sub { font-size:17pt; }
+ .kicker { font-size:9pt; letter-spacing:.05em; }
+ main { padding:32px 20px; border:0; }
+ h2 { font-size:18pt; } h2.part { margin-top:45px; padding-top:24px; }
+ h3 { font-size:13pt; }
+ .toc td:first-child { font-size:11.7pt; width:55%; }
+ .toc td:last-child { font-size:8.6pt; }
+ table { font-size:8.6pt; line-height:1.65; }
+ th,td { padding:8px 6px; }
+ .metric { font-size:7.8pt; }
+ .metric td,.metric th { padding:8px 3px; }
+ .phones { gap:10px; } .phones figure { padding:10px 7px; }
+ .phone { padding:16px; }
+ .equation math { font-size:12pt; }
+ pre { font-size:8pt; padding:13px; }
+}
+@media print {
+ html { scroll-behavior:auto; } body { background:white; font-size:10.5pt; line-height:1.78; }
+ main { margin:0; padding:0; border:0; }
+ .cover { width:210mm; height:297mm; padding:25mm 20mm 18mm; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+ .cover::before { top:16mm; left:20mm; }
+ .cover h1 { font-size:66pt; }
+ .cover .meta { font-size:10pt; line-height:2; }
+ .frontmatter { break-after:page; page-break-after:always; }
+ h2 { font-size:18pt; margin:24px 0 16px; }
+ h2.part { break-before:auto; page-break-before:auto; margin:28px 0 18px; padding-top:18px; }
+ h3 { margin:21px 0 10px; font-size:13pt; }
+ h4 { margin:17px 0 8px; font-size:11pt; }
+ p { margin-bottom:11px; }
+ table { font-size:9.1pt; line-height:1.6; margin:17px 0 19px; }
+ th,td { padding:7px 8px; }
+ .toc td { padding:10px 0; } .toc td:first-child { font-size:13pt; }
+ #abstract { margin-top:28px; }
+ a { color:inherit; border:0; }
+ .diagram,.diagram-page,.wide-shot { margin-top:17px; }
+ .diagram img { max-height:90mm; }
+ .diagram-page img { max-height:120mm; }
+ .phone { padding:14px; } .phone img { max-height:100mm; }
+ .phones { gap:5mm; margin-top:16px; } .phones figure { padding:10px; }
+ .phones img { max-height:95mm; }
+ .cap { font-size:8.7pt; margin-bottom:17px; }
+ .equation { margin:13px 0 17px; padding:11px; background:transparent; }
+ .equation math { font-size:12pt; }
+ pre { font-size:8.4pt; padding:13px 16px; line-height:1.6; }
+ th,.hl td { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+}
+
+
+@media print {
+ table:not(.toc) { break-inside:avoid; page-break-inside:avoid; }
+ pre { break-inside:avoid; page-break-inside:avoid; }
+ .keep-block,.print-figure { break-inside:avoid; page-break-inside:avoid; }
+ .phone { padding:8px; }
+ .phone img { max-height:88mm; }
+ .print-figure .cap { margin-bottom:14px; }
+}
+
+@media print { .materials-index { font-size:8.7pt; line-height:1.5; margin-bottom:10px; } .materials-index th,.materials-index td { padding:5px 7px; } .footer-note { display:none; } }
+
+.diagram img,.diagram-page img { width:100%; height:auto; max-height:none; object-fit:contain; }
+@media print { .diagram img,.diagram-page img { width:100%; height:auto; max-height:none; } }
+
 </style>
 </head>
 <body>
@@ -135,464 +177,409 @@
   <div>
     <div class="kicker">2026 算法创新赛 · 赛题 2 · AI+软件创新</div>
     <h1>时序</h1>
-    <div class="sub">课程群日程助手<br>技术方案</div>
+    <div class="sub">ChronoFlow 智能日程规划<br>技术方案</div>
   </div>
   <div class="meta">
-    作品名称：时序·课程群日程助手<br>
-    版本：Android 0.4.0<br>
-    团队成员：【待填写】
+    作品名称：时序 · ChronoFlow<br>
+    研究方法：风险感知滚动规划方法<br>
+    应用版本：Android 0.5.0<br>
+    日期：2026 年 10 月 19 日<br>
+    团队名称：________________<br>
+    团队成员：________________
   </div>
 </section>
 
-<h2>目录</h2>
+<main>
+<section class="frontmatter">
+<h2 id="contents">目录</h2>
 <table class="toc">
-  <tr><td>作品简介</td><td>问题、做法与评测边界</td></tr>
-  <tr><td>（一）产品概述与定位</td><td>用户、对照、设计原则、非目标</td></tr>
-  <tr><td>（二）技术架构与创新</td><td>链路、上传范围、评分、排程，以及 0.4.0 已核对差距</td></tr>
-  <tr><td>主流程图</td><td>待插入一整页流程图</td></tr>
-  <tr><td>（三）功能设计与实现</td><td>采集、规则、确认、日历、Canvas、提醒</td></tr>
-  <tr><td>（四）开发测试与部署</td><td>数据、指标、封闭测试、开发集、安装步骤</td></tr>
-  <tr><td>（五）应用价值与展望</td><td>场景走查、试用占位、边界与下一步</td></tr>
-  <tr><td>（六）附录</td><td>冻结记录、实现要点、参考文献</td></tr>
+  <tr><td><a href="#abstract">方案摘要</a></td><td>问题、方法与验证范围</td></tr>
+  <tr><td><a href="#product">（一）产品概述与定位</a></td><td>背景与目标、产品定位</td></tr>
+  <tr><td><a href="#architecture">（二）技术架构与创新</a></td><td>整体架构、技术选型、创新应用</td></tr>
+  <tr><td><a href="#functions">（三）功能设计与实现</a></td><td>核心规划、辅助入口、扩展性</td></tr>
+  <tr><td><a href="#development">（四）开发调试与部署</a></td><td>开发流程、代码实现、测试优化、部署方案</td></tr>
+  <tr><td><a href="#value">（五）应用价值与展望</a></td><td>应用场景、评估、市场与展望</td></tr>
+  <tr><td><a href="#appendix">（六）附录</a></td><td>设计资料、代码、测试记录与文献</td></tr>
 </table>
-<p class="note">插图位置用虚线框标出。第五节试用表中的数字全部是模拟占位，提交前必须替换。</p>
 
-<h2>作品简介</h2>
-<p>课程群里的作业、考试和调课通知容易被刷过去。一条消息里经常同时出现截止日期和预计耗时，过几小时又可能改期或取消。学生靠翻聊天记录，容易漏看或把钟点记错。把整段聊天交给通用对话助手，则可能把未核对的结果直接写成日程，并把群内容送出手机。</p>
-<p>时序是运行在 Android 8.0 及以上手机上的本地日程应用，界面名称为「时序 · 本地日程」，包名 <code>com.chronoflow.local</code>，当前版本 0.4.0。它只读取用户授权之后、系统通知栏里能对应到白名单群名的微信和 QQ 新通知，也可以由用户手工粘贴，或用个人令牌同步 Canvas 上的作业、公告和日历。本地规则先做结构化；用户打开 DeepSeek 并填写自己的 Key 之后，再由模型拆分事项。结果进入「发现」页。确认后才写入任务或固定日程，并在未来 14 天、每天用户设定的可用时段内，以 30 分钟为粒度避开已有安排。</p>
-<p>计划保存在应用私有目录，使用 Android Keystore 中的 AES-GCM 密钥加密，<code>allowBackup</code> 为 false。应用没有自建账号，也没有自建服务器。修改和取消需要确认后才写入。自动执行默认关闭；打开之后，当前版本仍可能把未填耗时、正文截断或疑似多事项的新建直接写入，详见第二节的已知差距。关闭 AI 之后，录入、确认、排程和提醒仍然可用。</p>
-<p>识别效果用 synthetic-v1 评测：开发集 400 条，封闭测试 100 条。文本由模板生成，课程和群名是占位符，没有双人标注，不能代替真人试用。封闭测试在看完开发集分数并冻结规则之后只跑一次。完整系统的动作 Macro-F1 为 0.964，规则系统为 0.765。后四列来自同一次模型返回，安全层不改写动作和时间。真人试用尚未完成，本文第五节的试用数字是模拟占位。</p>
+<h2 id="abstract">方案摘要</h2>
+<p>时序（ChronoFlow）是一款面向学生的智能学习日程应用，适用于课程时间固定、多项任务并行且安排经常变化的学习场景。系统将任务核对、时间安排与执行反馈连接起来：先由双头预测网络估计任务耗时分布和时段执行概率，再结合个人历史反馈进行校准，最后在课表、每日容量和锁定约束下，生成未来 14 天的学习计划。</p>
+<p>系统采用约 34.1 万参数的轻量网络，并将 ONNX 模型、特征编码与规划代码一并封装在 Android 安装包中。本机智能规划可在离线状态下运行；Canvas 同步与可选文本分析分别提供信息导入和内容理解能力。任务、课表及执行反馈保存在本机加密工作空间中，规划器在评价完成风险的同时控制重排扰动，使预测结果转化为可以执行、可以调整的日程。</p>
 
-<h2 class="part">（一）产品概述与定位</h2>
-<h3>1. 要解决的问题</h3>
-<p>课程通知有四个反复出现的困难。第一，截止时间经常是相对说法，例如「明天 18:00 前」「周五之前」「下周一」，离开发送时间就无法还原。第二，同一事项会被延期或取消，如果每次都新建一条，日历里会出现重复作业。第三，一条通知里可能有两件独立的事，只抽第一件会漏。第四，闲聊、表情和「有人吃饭吗」不应该进入计划。</p>
-<p>时序把这个问题收成一条可检查的链路：取得一条新通知，判断它属于哪个已授权的群，抽出动作、标题、时间和目标事项，标出不确定的字段，等人确认，再排进个人时间。它不替代微信或 QQ，也不把聊天记录当成数据库。</p>
 
-<h3>2. 用户与使用时机</h3>
-<p>目标用户是使用微信或 QQ 课程群、手机系统为 Android 8.0 及以上的学生。典型时机有四类。</p>
-<ul>
-  <li>作业或实验发布：通知里有事项名称、截止日期，有时还有预计小时数。确认后生成任务，并在截止前占用空档。</li>
-  <li>改期或取消：同一群随后说「改到下周一」或「不用交了」。系统应命中原来那条，确认后修改或取消，而不是再添一条。</li>
-  <li>班会、考试、讲座：给出开始和结束，记为固定日程。之后的作业排程避开这段时间。</li>
-  <li>信息不全：只有「下午」没有钟点，或上午下午都没写。系统留下核对问题，不把猜测写成已确定时间。</li>
-</ul>
-<p>没有通知使用权时，用户仍可在「发现」里手工录入一句文本，走同一条确认和排程。Canvas 是可选来源：用户在自己的课程站点创建 Access Token，作业和日历进入同一确认页。部分学校关闭了个人令牌，这时该入口不可用，群通知主路径不受影响。</p>
+</section>
 
-<h3>3. 与常见做法的差别</h3>
-<table>
-  <tr><th>能力</th><th>系统日历</th><th>通用对话助手</th><th>作业平台同步</th><th>时序</th></tr>
-  <tr><td>读取白名单群的新通知</td><td>无</td><td>需用户整段粘贴</td><td>无</td><td>有，仅系统通知</td></tr>
-  <tr><td>延期、取消并关联原事项</td><td>无</td><td>部分支持</td><td>部分支持</td><td>有，确认后写入</td></tr>
-  <tr><td>含糊信息先追问</td><td>无</td><td>取决于对话</td><td>无</td><td>引擎新问题最多两条；模型原问题仍会显示，最多 5 条</td></tr>
-  <tr><td>避开已有日程排未来两周</td><td>手工</td><td>无</td><td>无</td><td>有，30 分钟粒度</td></tr>
-  <tr><td>关闭云端模型后仍能使用</td><td>有</td><td>通常不能</td><td>部分支持</td><td>有</td></tr>
-  <tr><td>数据留在本机、无自建账号</td><td>有</td><td>通常上传</td><td>平台账号</td><td>有</td></tr>
-</table>
-<p>时序的可用范围也更窄：依赖 Android 的通知监听；对方没有弹出系统通知时，这条消息不会入库；iOS 没有对等接口，当前版本不覆盖。企业微信和 TIM 不在监听包名之中。</p>
+<h2 class="part" id="product">（一）产品概述与定位</h2>
+<h3>1. 背景与目标</h3>
+<p>学生的学习任务通常分散在课程平台、群通知和个人记录中。将这些信息转为日程，首先需要核对任务名称、截止日期及变更对象。例如，延期通知应更新原任务，而不是生成一项重复任务。信息整理完成后，还需要回答三个问题：何时开始、预留多久，以及临时变更后如何调整安排。</p>
+<p>传统的固定估时难以反映任务耗时与执行行为的差异。同一任务在不同学生之间可能耗时不同，同一学生在不同时段的执行概率也会变化。若新增任务或期限变化引发全量重排，已确认的安排又可能被频繁移动。此外，“未执行”和“执行超时”对应不同问题，需要分别记录和处理。</p>
+<p>针对这些问题，时序采用“信息核对—概率预测—约束规划—执行反馈”的处理流程。系统先将自动采集的信息整理为待确认提议，新增、延期和取消分别关联相应任务，并保留来源；手动录入则经表单校验后直接保存。双头网络随后预测耗时分布与时段执行概率，规划器据此在可用时间内分配学习时间块。用户反馈分别用于修正耗时估计和执行概率；重排时保留冻结或锁定的承诺，仅调整其余时间块。候选计划未通过风险复核时，系统继续采用参考计划。</p>
+<table class="line cols-3">
+<caption>表 1　学习场景与需求对应</caption>
+  <thead><tr><th>场景</th><th>常见困难</th><th>本方案的处理</th></tr></thead><tbody>
+  <tr><td>课程任务进入</td><td>来源重复、日期不清，延期信息可能生成重复任务</td><td>先核对待确认提议；变更关联原任务并保留来源</td></tr>
+  <tr><td>安排学习时间</td><td>固定估时难以反映超时风险，可用空档受课表限制</td><td>预测耗时分布；结合课表、容量与连续性检查计划可行性</td></tr>
+  <tr><td>临时变更</td><td>全量重排频繁移动已确认的安排</td><td>保留冻结和锁定块；比较原计划与修复候选</td></tr>
+  <tr><td>执行偏差</td><td>未执行与执行超时缺乏区分</td><td>分别记录执行结果和实际耗时，更新相应预测</td></tr>
+</tbody></table>
+<p>验收围绕业务、预测、规划和工程四个层面展开。业务层检查任务关联与变更处理；预测层检查耗时误差及概率校准；规划层检查截止损失、剩余工作、响应延迟与重排扰动；工程层检查本机运行、锁定保留、预算约束和失败恢复。各层结果分别报告，以明确不同验证结果的适用范围。</p>
 
-<h3>4. 设计原则</h3>
+<h3>2. 产品定位</h3>
+<p>时序定位于 Android 端的个人学习规划，主要服务有固定课表、需要同时处理多项短中期任务的学生。应用支持 Android 8.0（API 26）及以上系统，包名为 <code>com.chronoflow.local</code>，当前应用版本为 0.5.0。</p>
+<p>默认规划范围为未来 14 天，最多处理 30 项活动任务；时间槽长度为 30 分钟，每日任务容量为 360 分钟，可安排时段为 08:00–22:00。固定课程作为占用区间参与规划，任务可设置为允许拆分或必须连续完成。当前范围为单人学习安排，不涉及多人协商或团队联合调度。</p>
+<p>产品的核心能力是将概率预测用于受约束的日程安排。耗时分布表达任务可能需要的工作量，时段执行概率帮助选择安排位置，风险与扰动评价共同决定是否重排。模型随安装包部署，使这一过程能够在手机本机完成。表 2 对照相关产品的公开功能，说明时序的场景定位。</p>
+<table class="brand cols-3">
+<caption>表 2　产品定位与公开功能比较</caption><thead><tr><th>产品或类别</th><th>公开功能定位</th><th>时序的切入点</th></tr></thead><tbody><tr><td>日历与课程平台</td><td>记录固定事件、发布课程资料与截止日期</td><td>在固定课表之外生成学习时间块，保留任务来源和变更关系</td></tr><tr><td>TickTick</td><td>待办管理、提醒、日历视图与专注工具 <a href="#ref-6">[6]</a></td><td>面向课程任务展示耗时分位数，利用执行反馈校准后续预测</td></tr><tr><td>Motion</td><td>根据截止日期、优先级等自动安排和重排任务 <a href="#ref-5">[5]</a></td><td>结合学生课表与端侧预测，明确评价尾部风险和重排成本</td></tr><tr><td>Reclaim</td><td>按可用时间安排任务，支持拆分、冲突重排等规则 <a href="#ref-4">[4]</a></td><td>分别建模耗时与执行行为，通过独立复核选择计划并加密保存状态</td></tr><tr><td>时序</td><td>Android 本机概率预测与受约束滚动规划</td><td>根据有效反馈修正耗时均值和时段概率，保留冻结或锁定的安排</td></tr></tbody></table>
+<p>当前交付以 Android 客户端为主。网页端保留任务、课表、课程作业导入与基础排程，跨端同步列入后续规划。通知采集仅处理系统已展示且获得授权的白名单消息，提醒遵循 Android 后台调度机制。全局网络在端侧保持冻结，演示与验收以 Android 内置模型的实际运行状态为依据。</p>
+<div class="print-figure"><div class="phone"><img src="figures/shots/today.jpg" alt="今天页显示本机智能规划和耗时分位数" /></div>
+<p class="cap">图 1　今天页。本机智能规划展示学习安排，并以 P50、P80、P95 表达任务耗时预测。截图使用测试账号。</p></div>
+
+<h2 class="part" id="architecture">（二）技术架构与创新</h2>
+<h3>1. 整体架构</h3>
+<p>系统分为交互、本地业务状态、概率预测和滚动规划四层。Kotlin 与 Jetpack Compose 提供页面和操作入口；业务层管理任务变更、执行反馈与加密存储；嵌入式 Python 复用特征编码和规划代码；ONNX Runtime Android 在手机 CPU 上执行冻结网络。各层通过本机调用衔接，规划过程无需访问模型服务器。</p>
+<table class="soft cols-3">
+<caption>表 3　系统层次及模块职责</caption>
+  <thead><tr><th>层次</th><th>职责</th><th>主要实现</th></tr></thead><tbody>
+  <tr><td>交互与状态</td><td>提供今天、发现、任务、日历和设置页面，校验输入并反馈运行状态</td><td>Compose、AppViewModel</td></tr>
+  <tr><td>业务与持久化</td><td>管理来源合并、用户确认、任务变更、执行反馈与账号隔离</td><td>LocalRepository、LocalEngine、加密存储</td></tr>
+  <tr><td>端侧适配</td><td>将当前工作空间转换为规划输入，校验返回的预测和时间块</td><td>ModelPlannerClient、deployment.planning</td></tr>
+  <tr><td>概率预测</td><td>编码任务，输出耗时分布参数与时段执行概率</td><td>ONNX Runtime Android</td></tr>
+  <tr><td>滚动规划</td><td>生成候选计划，完成风险评价、局部修复、独立复核与失败回退</td><td>improved_planner、integrated_planner</td></tr>
+</tbody></table>
+<p>任务可以手动录入，也可以从 Canvas 自动同步。用户连接学校 Canvas 并授权后，系统获取作业、公告和日历事项，整理任务名称、截止日期、所属课程及来源，并汇入「发现」页。用户核对后，信息才转为正式任务并参与规划。作业延期或内容更新时，系统关联原有事项，保留变更来源，避免重复创建。</p>
+<p>可选文本分析用于通知理解、摘要和复盘，与本机规划分别配置。Canvas 同步和文本分析需要联网；已保存任务的预测与排程仍在本机完成。网络不可用时，用户可以继续录入、查看和安排本地任务。构建过程仅将生产模块与部署模型写入 APK，训练数据、实验报告、PyTorch 检查点和服务端密钥不进入安装包。</p>
+<div class="diagram"><img src="figures/F01-architecture.png" alt="系统总体架构" width="1852" height="849" >
+<p class="cap">图 2　系统总体架构。实线表示本机预测与规划路径；虚线表示 Canvas 同步及可选文本分析等联网入口。结构示意。</p></div>
+
+<h3>2. 技术选型</h3>
+<p>预测模块采用字符特征与轻量多层感知机。任务标题经过字符 2/3-gram 哈希编码，生成 32 维任务表示，并与任务属性、用户状态和时间槽特征组合。该结构输入固定、输出明确，便于在端侧复现。网络负责估计分布参数和执行概率，课表、容量、连续性及锁定约束则由规划代码检查，从而明确划分预测与决策的职责。</p>
+<table class="brand cols-3">
+<caption>表 4　技术选型与依据</caption>
+  <thead><tr><th>环节</th><th>选型</th><th>依据</th></tr></thead><tbody>
+  <tr><td>客户端</td><td>Kotlin、Jetpack Compose，minSdk 26，targetSdk 35</td><td>界面与存储在 Android 实现，领域逻辑可通过 JVM 回归验证</td></tr>
+  <tr><td>预测网络</td><td>PyTorch 训练，导出 ONNX opset 17</td><td>约 34.1 万参数、1.31 MiB 权重，支持动态批大小及时间槽数</td></tr>
+  <tr><td>手机推理</td><td>ONNX Runtime Android 1.23.2，CPU <a href="#ref-2">[2]</a></td><td>在手机执行 ONNX 网络，减少对训练框架的运行时依赖</td></tr>
+  <tr><td>规划运行时</td><td>Chaquopy 17.1.0 内置 Python 3.12 <a href="#ref-3">[3]</a></td><td>复用研究环境中的特征编码与规划实现</td></tr>
+  <tr><td>可选文本理解</td><td>兼容 Chat Completions 的 HTTPS 接口</td><td>经用户启用后处理文本，与内置规划分别配置</td></tr>
+  <tr><td>本地存储</td><td>Android Keystore 与 AES-GCM</td><td>工作空间独立加密，禁用系统备份</td></tr>
+</tbody></table>
+<p>网络由共享任务编码器、耗时预测头和执行预测头组成，具体层宽见表 5。隐藏层使用 SiLU 激活函数和 0.1 的 Dropout。耗时尺度参数通过 softplus 变换后加 0.08，并以 2.0 为上限，以维持数值稳定。</p>
+<table class="soft cols-3">
+<caption>表 5　预测网络结构</caption>
+  <thead><tr><th>模块</th><th>结构</th><th>输出</th></tr></thead><tbody>
+  <tr><td>标题投影</td><td>2048 → 128，SiLU</td><td>标题表示</td></tr>
+  <tr><td>共享编码器</td><td>176 → 256 → 64 → 32</td><td>任务表示 z</td></tr>
+  <tr><td>耗时头</td><td>任务表示与 12 维用户状态拼接，44 → 64 → 2</td><td>对数正态参数 μ 与有界尺度 σ</td></tr>
+  <tr><td>执行头</td><td>任务表示、槽状态与槽属性拼接，56 → 64 → 1</td><td>每个时间槽的执行 logit</td></tr>
+</tbody></table>
+<p>共享编码器的 176 维输入由四部分构成：128 维标题表示、16 维类别嵌入、16 维课程嵌入和 16 维数值属性。任务类别共 8 类；课程先映射到 512 个稳定哈希桶，再查询嵌入。网络输出耗时分布参数和执行 logits，后续由规划器生成时间块。部署期间网络权重保持冻结，个人反馈通过显式校准参与决策。</p>
+<table class="line cols-2">
+<caption>表 6　输入特征与编码规则</caption>
+  <thead><tr><th>输入</th><th>维度与处理</th></tr></thead><tbody>
+  <tr><td>标题</td><td>2048 维。完成 NFKC 规范化、小写转换与空白合并后，以字符 2/3-gram 进行有符号哈希，再作 L2 归一化。</td></tr>
+  <tr><td>类别 / 课程</td><td>类别与课程各为 16 维。8 类任务使用可学习嵌入；课程映射到 512 个稳定哈希桶后查询嵌入。</td></tr>
+  <tr><td>任务数值</td><td>16 维，按固定顺序编码难度、优先级、对数估时、截止距离、已发布时长、最早开始延迟及可拆分标记等；难度除以 5，优先级除以 10。</td></tr>
+  <tr><td>用户状态</td><td>12 维接口包含近 7 日完成率、跳过、延后、耗时比与积压等。当前端侧使用全零向量，个人历史通过显式校准参与预测。</td></tr>
+  <tr><td>时间槽</td><td>每槽包含 12 维属性及 12 维槽级状态，编码时段、星期、计划时长、既有负荷与期限信息；缺失截止日期编码为无期限压力。</td></tr>
+</tbody></table>
+
+<div class="keep-block">
+<h3>3. 创新应用</h3>
+<p>本方案的创新重点在于连接预测、个性化与规划决策。系统分别处理任务耗时和执行行为，再将两类信息纳入风险评价与重排控制。图 3 展示完整方法，各环节的作用如下。</p>
+<div class="diagram-page">
+  <img src="figures/drp-main-p1.png" alt="ChronoFlow 中文方法主图：冻结双头预测、在线个人校准和带复核的滚动规划" width="1586" height="992" >
+  <p class="cap">图 3　ChronoFlow 方法框架。左侧为冻结的双头预测网络，中部为在线个人校准，右侧为风险感知滚动规划与独立复核。采用方案或参考计划均进入滚动计划，执行后的有效反馈参与下一轮校准；底部时间轴区分冻结区间、锁定块、固定课程及可调整学习块。结构示意。</p>
+</div>
+</div>
 <ol>
-  <li>先限制采集，再调用模型。只有白名单群的新通知正文会进入解析。历史聊天不回填。</li>
-  <li>模型输出被限制为事项操作：新建、修改、取消任务或日程，以及忽略。修改和取消的目标必须是本地仍存在的活动事项。提示词要求使用本次候选，客户端目前按全部活动事项校验，不限于这次附上的最多 30 条。</li>
-  <li>证据和推测分开。依据必须能在原文中逐字找到，否则客户端丢弃该条证据。引擎新写的问题最多两条；模型原来的问题仍留在备注里，最多 5 条，发现页会显示。</li>
-  <li>写入计划之前默认有一次人工确认。自动执行开关默认关闭。打开后，字段分通过的新建仍可能在未填耗时、正文截断或疑似多事项时直接创建。只有耗时缺失才写成 60 分钟；已经识别出的小时数会照实写入。</li>
-  <li>识别和排程分开。DeepSeek 超时或返回无法解析时，退回本地规则。断网不影响已在手机上的确认和重排。</li>
-  <li>个人耗时只从这台手机上用户确认完成的记录里估计。合成评测样本不进入该模型。</li>
+  <li><b>预测与决策分工。</b>网络估计任务耗时与时段执行概率，规划器负责安排具体位置。候选时间块通过课表、互斥、容量、连续性及承诺约束检查后，才进入计划。</li>
+  <li><b>分别学习两类不确定性。</b>耗时采用对数正态负对数似然，执行行为采用二分类损失。完成和部分完成标记为发生执行，跳过和延后标记为未执行；未知反馈、补齐位置及未选中的候选时间块不参与监督。</li>
+  <li><b>以轻量校准实现个性化。</b>执行概率采用强度为 4 的网络先验进行收缩更新；耗时均值依据对数残差修正，尺度参数保持不变。该机制在样本较少时保留全局预测的影响，并随反馈积累逐步体现个人差异。</li>
+  <li><b>同时评价风险与扰动。</b>规划目标组合期望损失、0.5 倍 CVaR<sub>0.9</sub> 和归一化扰动成本。系统既关注常态下的完成情况，也关注不利情景下的尾部损失，并通过独立复核决定是否采用新计划。</li>
+  <li><b>在端侧完成规划。</b>模型与规划代码随 APK 分发，任务预测和时间安排可离线运行。可选联网功能分别授权，其启用状态不影响已保存任务的本机规划。</li>
+</ol>
+<p>该方法属于有限候选的风险感知启发式规划，不包含分布鲁棒优化的歧义集合，也不提供全局最优保证。评估将八种方法置于共享潜在执行结果的回放环境中，以比较不同预测信息和规划机制的作用。</p>
+
+<h2 class="part" id="functions">（三）功能设计与实现</h2>
+<h3>1. 核心功能</h3>
+<h4>1.1 耗时分布与执行概率</h4>
+<p>耗时预测采用对数正态分布，界面展示 P50、P80 和 P95 三个分位数。表 7 以同一示例分布说明其含义，数值经取整，仅用于解释读法。</p>
+<table class="metric cols-3">
+<caption>表 7　耗时分位数读法示例</caption>
+  <thead><tr><th>输出</th><th>示例</th><th>含义</th></tr></thead><tbody>
+  <tr><td>P50</td><td>60 分钟</td><td>在该示例分布下，约 50% 的耗时不超过 60 分钟</td></tr>
+  <tr><td>P80</td><td>90 分钟</td><td>在该示例分布下，约 80% 的耗时不超过 90 分钟</td></tr>
+  <tr><td>P95</td><td>约 133 分钟</td><td>在该示例分布下，约 95% 的耗时不超过 133 分钟</td></tr>
+</tbody></table>
+<div class="diagram"><img src="figures/F04-quantiles.png" alt="耗时分位数与时段概率示意" width="1983" height="793" >
+<p class="cap">图 4　耗时分布与四时段执行概率示意。图中曲线及概率用于说明概念，不表示项目实测结果。</p></div>
+<p>设任务实际工作分钟为 <span class="math-inline">T</span>，其对数服从正态分布。分布形式与分位数计算如下：</p><div class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="耗时分布与分位数"><mrow><mi mathvariant="normal">log</mi><mi>T</mi><mo>∼</mo><mi>𝒩</mi><mrow><mo>(</mo><mrow><mi>μ</mi><mo>,</mo><msup><mi>σ</mi><mn>2</mn></msup></mrow><mo>)</mo></mrow></mrow></math><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="耗时分布与分位数"><mrow><msub><mi>Q</mi><mi>q</mi></msub><mo>=</mo><mi mathvariant="normal">exp</mi><mo>[</mo><mi>μ</mi><mo>+</mo><msup><mi>Φ</mi><mn>−1</mn></msup><mrow><mo>(</mo><mi>q</mi><mo>)</mo></mrow><mi>σ</mi><mo>]</mo></mrow></math></div><p>P50 表示耗时中位数，P80 和 P95 表示更保守的工作量估计。执行概率则描述任务在候选时段是否发生执行，与整项任务是否完成分别记录。长任务可以跨多个时间槽推进。当前端侧按上午、下午、晚上和夜间四个时段构造预测输入。</p>
+<p>手机端以用户确认的剩余工时作为排程依据，并按任务整体向上取整到 30 分钟槽。例如，60 分钟和 45 分钟均占用两个槽；后者包含 15 分钟取整余量。耗时分位数用于风险评价，不自动增加确认预算。研究回放可采用分位数和执行概率缓冲生成候选，两种模式的结果分别评价。</p>
+
+<h4>1.2 在线个性化</h4>
+<p>执行概率通过时段历史反馈更新。设时段 <span class="math-inline">b</span> 的网络概率为 <span class="math-inline">p<sub>b</sub></span>，已观察到的执行次数和尝试次数分别为 <span class="math-inline">s<sub>b</sub></span>、<span class="math-inline">n<sub>b</sub></span>。以网络概率作为强度为 4 的先验，更新式为：</p><div class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="时段执行概率更新"><mrow><msub><msup><mi>p</mi><mo>′</mo></msup><mi>b</mi></msub><mo>=</mo><mfrac><mrow><mn>4</mn><msub><mi>p</mi><mi>b</mi></msub><mo>+</mo><msub><mi>s</mi><mi>b</mi></msub></mrow><mrow><mn>4</mn><mo>+</mo><msub><mi>n</mi><mi>b</mi></msub></mrow></mfrac></mrow></math></div><p>耗时校准仅使用已完成任务的可靠用时。设有效反馈数为 <span class="math-inline">n</span>，对数残差和为 <span class="math-inline">r</span>，则修正对数均值 <span class="math-inline">μ</span>，同时保持尺度参数 <span class="math-inline">σ</span> 不变：</p><div class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="耗时残差与均值更新"><mrow><mi>r</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><mrow><mo>(</mo><mrow><mi mathvariant="normal">log</mi><msub><mi>t</mi><mi>j</mi></msub><mo>−</mo><msub><mi>μ</mi><mi>j</mi></msub></mrow><mo>)</mo></mrow></mrow></math><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="耗时残差与均值更新"><mrow><msup><mi>μ</mi><mo>′</mo></msup><mo>=</mo><mi>μ</mi><mo>+</mo><mfrac><mi>r</mi><mrow><mn>4</mn><mo>+</mo><mi>n</mi></mrow></mfrac></mrow></math></div><p>没有历史反馈时，系统使用全局预测。每次调用仅重建当前账号的有效历史，拒绝未来时刻的完成或反馈记录。跳过计入尝试次数，并占用相应的当日容量。</p>
+<div class="diagram"><img src="figures/F05-posterior.png" alt="后验修正过程" width="1983" height="793" >
+<p class="cap">图 5　在线个性化校准。执行概率公式中的 s、n 分别为对应时段的执行数和尝试数；耗时公式中的 r 为对数残差和，n 为可靠完成耗时记录数。耗时校准保持对数域 σ 不变，全局网络权重保持冻结。机制示意。</p></div>
+<p>当前研究与端侧实现均使用全零网络用户状态和四时段原型特征，个人历史主要通过上述显式校准进入规划。完整长期用户状态及真实候选块负荷属于后续输入扩展范围。</p>
+
+<h4>1.3 风险感知滚动规划</h4>
+<p>规划器在不同执行情景下评价计划质量。单次情景损失由截止损失、剩余工作和响应延迟组成：</p><div class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="单次情景组合损失"><mrow><mi>L</mi><mo>=</mo><mi>D</mi><mo>+</mo><mn>0.15</mn><mi>U</mi><mo>+</mo><mn>0.10</mn><mi>R</mi></mrow></math></div><p>其中，<span class="math-inline">D</span> 为窗口内到期任务的优先级加权未按时完成比例，<span class="math-inline">U</span> 为加权剩余工作比例，<span class="math-inline">R</span> 为从决策时刻到完成或窗口末尾的归一化延迟。在此基础上，主目标结合期望损失与尾部风险 <a href="#ref-1">[1]</a>，总目标进一步计入重排扰动：</p><div class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="风险主目标与总目标"><mrow><msub><mi>J</mi><mtext>primary</mtext></msub><mo>=</mo><mi>𝔼</mi><mo>[</mo><mi>L</mi><mo>]</mo><mo>+</mo><mn>0.5</mn><msub><mi mathvariant="normal">CVaR</mi><mn>0.9</mn></msub><mrow><mo>(</mo><mi>L</mi><mo>)</mo></mrow></mrow></math><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="风险主目标与总目标"><mrow><mi>J</mi><mo>=</mo><msub><mi>J</mi><mtext>primary</mtext></msub><mo>+</mo><mn>0.15</mn><mi>S</mi></mrow></math></div><p><span class="math-inline">S</span> 为归一化扰动成本，覆盖时间块的移动、新增和删除，并对临近的旧时间块赋予更高权重。因此，扰动成本与日历上实际移动的分钟数分别计量。</p>
+<p>为降低冷启动阶段对少量反馈的依赖，情景生成同时使用网络预测和初始估时先验。网络分布的权重随有效耗时反馈数 <span class="math-inline">n</span> 增长：</p><div class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="冷启动模型分布权重"><mrow><mi>w</mi><mrow><mo>(</mo><mi>n</mi><mo>)</mo></mrow><mo>=</mo><mn>0.5</mn><mo>+</mo><mn>0.5</mn><mfrac><mi>n</mi><mrow><mi>n</mi><mo>+</mo><mn>8</mn></mrow></mfrac></mrow></math></div><p>其余情景由初始估时对应的对数正态分布生成，尺度参数为 <span class="math-inline">σ = 0.35</span>，执行率先验为 0.75。尾部风险基于两组情景合并后的损失评价。</p>
+<div class="diagram"><img src="figures/F06-cvar.png" alt="期望损失与尾部风险示意" width="1983" height="793" >
+<p class="cap">图 6　期望损失与尾部风险。着色区域表示最差 10% 的情景损失，图中目标式仅展示风险主目标；完整扰动项与约束见正文。概念示意，不对应正式测试数值。</p></div>
+<p>候选搜索先比较最早截止优先、保留旧计划后补空、分位数与优先级或松弛量组合、时段偏好及执行率缓冲等策略。候选通过硬约束检查并去重后，规划器按 1、2、4 项直至全部受影响任务逐步扩大修复范围。</p>
+<p>筛选同时检查均值与尾部风险：配对损失差的近似上界应不超过 0，尾部则比较经验 CVaR。参考搜索、集成筛选和最终复核各使用独立的 16 个情景样本，编号依次为 0–15、16–31 和 32–47。最终复核未通过时直接返回参考计划，避免在复核样本上再次搜索。</p>
+<div class="diagram"><img src="figures/F07-search.png" alt="两级候选搜索与复核回退" width="1983" height="793" >
+<p class="cap">图 7　候选搜索与独立复核流程。搜索、筛选和复核分别使用独立样本；复核失败时保留参考计划。</p></div>
+<p>硬约束要求任务已发布且到达最早开始时间，时间块互不重叠，并避开固定课程。所有安排应位于规划窗口和工作时段内，满足每日容量及不可拆任务的连续性要求，同时保留锁定块和未来 120 分钟内的冻结安排。截止日期参与风险评价；容量不足时，系统允许出现未完成或逾期，并明确显示缺口。</p>
+<p>确认工时模式分别计量剩余工作分钟和日历占用分钟。设任务 <span class="math-inline">i</span> 的剩余工作分钟为 <span class="math-inline">r<sub>i</sub></span>，以 30 分钟为单位向上取整，得到日历预算：</p><div class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="任务日历占用预算"><mrow><msub><mi>B</mi><mi>i</mi></msub><mo>=</mo><mn>30</mn><mo>×</mo><mo>⌈</mo><mfrac><msub><mi>r</mi><mi>i</mi></msub><mn>30</mn></mfrac><mo>⌉</mo></mrow></math></div><p>未来时间块的占用总量不得超过该预算。取整余量小于 30 分钟，仅用于时间槽对齐。规划先扣除锁定或正在执行的承诺，再分配剩余预算；若受保护承诺已超出预算，则提示用户核对并保留原块。截止前空档不足时，仅安排可用部分，并展示未安排工时。</p>
+<div class="phones pair">
+  <figure><img src="figures/shots/calendar-60.jpg" alt="高等数学复习排成两段各三十分钟" /><figcaption>(a) 确认 60 分钟：两个 30 分钟槽</figcaption></figure>
+  <figure><img src="figures/shots/calendar-avoid.jpg" alt="计算机网络课后学习块移到十点" /><figcaption>(b) 加入课程后：学习块避开 08:00–10:00</figcaption></figure>
+</div>
+<p class="cap">图 8(a)–(b)　同日日历对照。左图将 60 分钟任务分为两个时间槽；右图加入 08:00–10:00 的固定课程后，学习安排避让至 10:00 之后。</p>
+
+<h4>1.4 用户可观察到的闭环</h4>
+<table class="cols-3">
+<caption>表 8　用户操作闭环</caption>
+  <thead><tr><th>步骤</th><th>入口</th><th>可观察结果</th></tr></thead><tbody>
+  <tr><td>采集信息成为任务</td><td>发现页核对后确认</td><td>核对并修正名称、日期及耗时，确认后保存</td></tr>
+  <tr><td>生成本机计划</td><td>今天页「生成智能计划」</td><td>显示「当前计划：本机智能规划」，并列出 P50 / P80 / P95</td></tr>
+  <tr><td>固定与锁定</td><td>日历中的固定日程和锁定</td><td>学习安排避开课程，锁定块在重排后保持不变</td></tr>
+  <tr><td>延期与取消</td><td>发现页选择已有事项</td><td>更新原任务并保留来源，不重复创建</td></tr>
+  <tr><td>执行反馈</td><td>完成、跳过、延后和实际用时</td><td>分别保存时间块执行结果与整项任务完成状态</td></tr>
+</tbody></table>
+<div class="phones pair">
+  <figure><img src="figures/shots/discover.jpg" alt="发现页待确认实验三" /><figcaption>(c) 发现页待确认</figcaption></figure>
+  <figure><img src="figures/shots/postpone.jpg" alt="延期核对为修改原任务" /><figcaption>(d) 延期关联原任务</figcaption></figure>
+</div>
+<div class="phones pair">
+  <figure><img src="figures/shots/task-exp3.jpg" alt="实验三任务卡片" /><figcaption>(e) 任务页：截止日期为 10/21</figcaption></figure>
+  <figure><img src="figures/shots/sources.jpg" alt="实验三保留两条来源" /><figcaption>(f) 原通知与延期通知两条来源</figcaption></figure>
+</div>
+<p class="cap">图 8(c)–(f)　任务核对与延期处理。延期通知关联已有的「实验三」，任务截止时间更新为 10 月 21 日 18:00，同时保留原通知和延期通知两条来源。测试账号截图。</p>
+
+<h3>2. 辅助功能</h3>
+<p>辅助功能负责提供任务信息、维护使用状态和处理异常，与核心规划形成衔接。各入口及其作用见表 9。</p>
+<table class="cols-3">
+<caption>表 9　辅助功能与规划关系</caption>
+  <thead><tr><th>模块</th><th>作用</th><th>与规划的关系</th></tr></thead><tbody>
+  <tr><td>手动任务</td><td>录入任务名称、课程、期限与预计耗时</td><td>保存后参与本机规划</td></tr>
+  <tr><td>Canvas</td><td>经个人令牌授权，同步课程作业、公告与日历事项</td><td>通过学校官方接口同步，新增与变更先进入发现页核对</td></tr>
+  <tr><td>微信 / QQ 通知</td><td>采集系统已展示且符合白名单规则的群通知</td><td>默认关闭；启用后可使用本地规则或经授权的文本分析</td></tr>
+  <tr><td>可选文本分析</td><td>提供复合通知拆分、摘要、风险说明与复盘</td><td>独立于内置规划；处理失败时保留原任务状态</td></tr>
+  <tr><td>本机账号</td><td>提供注册、登录与游客模式，按身份保存工作空间</td><td>账号切换后隔离任务、反馈与未完成请求</td></tr>
+  <tr><td>基础排程</td><td>本机模型关闭或自动重排失败时提供基础安排</td><td>界面标记「离线基础排程」，与模型计划分别展示</td></tr>
+</tbody></table>
+<div class="diagram"><img src="figures/F02-sources.png" alt="手动录入直接保存，系统通知与 Canvas 经发现页核对后进入任务状态" width="1983" height="793" >
+<p class="cap">图 9　任务来源与核对流程。手动录入经表单校验后直接保存；系统通知经文本分析与去重、Canvas 按外部记录合并后，进入发现页核对。修改与取消关联已有任务，确认后仅应用一次。结构示意。</p></div>
+<p>通知处理按动作、名称、时间、目标和原文证据进行字段级核对。修改与取消必须关联已有任务，去重综合来源、群名、发送者、正文及约 10 分钟的时间窗。启用可选文本分析时，首次请求发生在业务去重之前，重复消息仍可能产生请求。该入口主要解决信息整理问题，预测与规划评价单独开展。</p>
+
+<h3>3. 扩展性设计</h3>
+<p>模型、特征与规划约束采用清晰的接口分工。模型升级时更换经校验的 ONNX 文件及特征配置，规划约束继续由独立代码检查。可选文本分析按工作空间配置接口地址、模型与密钥，支持比赛官方网关或用户指定的 HTTPS 服务。</p>
+<p>后续扩展长期用户状态或真实候选块负荷时，应固定特征定义与对照条件，并使用独立版本评价其相对当前输入的增益。</p>
+<p>候选生成策略、风险权重和确认工时模式均采用显式配置。研究回放与手机产品使用各自的预算口径；网络、先验、搜索策略和容量配置的变化均绑定版本与评估记录，保证结果可追溯。</p>
+
+<h2 class="part" id="development">（四）开发调试与部署</h2>
+<h3>1. 开发流程</h3>
+<p>开发按任务与状态建模、预测与规划、端侧集成、测试归档等工作逐步推进。算法生产源码维护于 <code>model/</code>，Android 工程维护于 <code>apps/android/</code>。构建时按白名单复制生产模块，使研究与端侧共用主要算法实现。五个开发阶段及其职责、交付物见表 10。</p>
+<table class="line cols-3">
+<caption>表 10　开发阶段与职责</caption><thead><tr><th>开发阶段</th><th>工作线与职责</th><th>交付物</th></tr></thead><tbody><tr><td>第一阶段</td><td>建立任务与课表数据模型，接入课程来源，准备受控通知样本和基础评估</td><td>Android 原型、Canvas 连接、结构化任务与评估入口</td></tr><tr><td>第二阶段</td><td>完善账号与 API 配置，统一网页和 Android 的交互及视觉</td><td>账号隔离、文本接口模式与一致的页面组织</td></tr><tr><td>第三阶段</td><td>实现双头预测与风险规划，建立因果回放和基线对照</td><td>训练入口、预测网络、基线方法与回放器</td></tr><tr><td>第四阶段</td><td>完成 ONNX 导出和嵌入式 Python 集成，落地确认工时预算约束</td><td>端侧模型、内置规划路径、Debug APK 与构建记录</td></tr><tr><td>第五阶段</td><td>开展约束回归、模型一致性和设备闭环验证，归档实现与测试材料</td><td>测试用例、结果记录、模型校验清单与版本化说明</td></tr></tbody></table><p>各工作线通过统一接口衔接。算法侧提供冻结模型、特征定义和规划协议，客户端提供任务及反馈快照，测试侧检查约束、持久化、失败恢复与账号隔离，文档侧维护版本信息和证据索引。</p>
+
+<h3>2. 代码实现</h3>
+<p>训练入口默认采用 AdamW 优化器，耗时损失与执行损失分别在有效标签上取均值，默认权重均为 1。主要超参数见表 11，包括学习率、批大小、最大轮次、早停及梯度裁剪。表中为代码默认配置，交付权重的实际训练轮次以训练日志和检查点记录为准。</p>
+<p>数据适配遵循时间因果约束：用户状态仅取预测日期之前的记录，预测时刻不得早于任务发布，计划生成不得早于任务可见，模拟真值字段不进入输入特征。预测数据按用户划分为训练 42 名、验证 9 名、测试 9 名，另设 30 个语义族留出。两种测试视图存在部分重叠，结果分别解释。</p>
+<table class="soft cols-3">
+<caption>表 11　训练默认配置</caption>
+  <thead><tr><th>训练项目</th><th>默认配置</th><th>说明</th></tr></thead><tbody>
+  <tr><td>优化</td><td>AdamW，学习率 0.001</td><td>权重衰减 0.0001，梯度范数裁剪 5.0</td></tr>
+  <tr><td>轮次</td><td>最多 80 epoch，batch 64</td><td>验证总损失连续 10 轮不改善则早停</td></tr>
+  <tr><td>随机性</td><td>使用固定随机种子</td><td>保存验证损失最好的检查点</td></tr>
+  <tr><td>耗时标签</td><td>具有可靠记录的实际工作分钟</td><td>缺失标签不参与损失，耗时目标下限为 1 分钟</td></tr>
+  <tr><td>执行标签</td><td>完成、部分完成为正例</td><td>跳过、延后为负例，未知反馈及未选中候选不参与训练</td></tr>
+  <tr><td>划分</td><td>用户 42 / 9 / 9</td><td>另设 30 个语义族留出，两种测试视图存在部分重叠</td></tr>
+</tbody></table>
+<p>部署元信息记录模型版本及训练标记；训练入口的默认配置与交付模型的实际训练过程分别管理。</p>
+<p>业务数据围绕任务、固定占用、待确认提议、时间块和执行记录组织。任务编号在变更过程中保持稳定，工作分钟与日历占用分别计量；时间块记录来源引擎与计划版本，执行反馈仅在发生后进入个性化。各对象的字段及一致性规则见表 12。</p>
+<table class="line cols-2">
+<caption>表 12　核心对象与一致性规则</caption>
+  <thead><tr><th>对象</th><th>关键字段与一致性</th></tr></thead><tbody>
+  <tr><td>任务</td><td>包含编号、标题、课程、类别、难度、估时、剩余工时、截止日期与状态。编号保持稳定，剩余工时不超过确认工时，完成时间可追溯。</td></tr>
+  <tr><td>固定占用</td><td>包含名称、起止时间与来源。结束晚于开始，按实际区间占用，学习任务须避开该区间。</td></tr>
+  <tr><td>待确认提议</td><td>保存原文、来源、动作、关联目标、日期、耗时和证据。每条提议仅应用一次，修改与取消须关联已有事项。</td></tr>
+  <tr><td>时间块</td><td>保存任务编号、起止时间、锁定状态、计划版本与引擎标识。时间块互不重叠，重排保留锁定承诺。</td></tr>
+  <tr><td>执行记录</td><td>保存关联任务、计划起点、时长、结果与记录时刻。已发生的有效记录参与个性化及容量累计。</td></tr>
+</tbody></table>
+<div class="callout">核心模块：<code>model/src/chronoflow_model/</code> 中的网络、损失和特征；<code>model/evaluation/</code> 中的预测修正、候选搜索和集成规划；<code>model/deployment/</code> 中的端侧适配；<code>apps/android</code> 中的 <code>ModelPlannerClient</code> 与 <code>EmbeddedModelRuntime</code>。</div>
+
+<h4>2.1 核心代码片段</h4>
+<p>耗时分位数由网络输出的对数正态参数直接计算。输入张量最后一维依次为 <span class="math-inline">μ</span> 和 <span class="math-inline">σ</span>，输出单位为分钟，无需通过采样近似分位数。</p>
+<pre><code>def duration_quantiles(parameters: Tensor) -&gt; tuple[Tensor, Tensor, Tensor]:
+    &quot;&quot;&quot;Return log-normal P50/P80/P95 in minutes without sampling.&quot;&quot;&quot;
+    mu, sigma = parameters[..., 0], parameters[..., 1]
+    p50 = torch.exp(mu)
+    p80 = torch.exp(mu + 0.8416212336 * sigma)
+    p95 = torch.exp(mu + 1.6448536270 * sigma)
+    return p50, p80, p95</code></pre>
+<p class="note">代码 1　<code>chronoflow_model/network.py::duration_quantiles</code>。两个常数分别为标准正态分布的 0.8 和 0.95 分位点，P50 由对数均值直接计算。</p>
+<p>在线更新使用冻结网络的预测与历史计数。耗时分支累积对数残差，时段分支将网络概率作为强度为 4 的先验，以收缩更新降低小样本波动。</p>
+<pre><code>if personalized:
+    for key, (success, total) in history.items():
+        if key == &#x27;_duration&#x27;:
+            mu += success / (4 + total)
+        else:
+            probabilities[key] = (
+                4 * probabilities[key] + success
+            ) / (4 + total)
+return mu, sigma, probabilities</code></pre>
+<p class="note">代码 2　<code>evaluation/predictor.py::Predictor.predict</code> 的字典历史分支。耗时分支中的 <code>success</code>、<code>total</code> 分别为残差和及完成数；时段分支中二者分别为执行次数和尝试次数。更新过程保持全局网络权重不变。</p>
+
+<h3>3. 测试优化</h3>
+<p>验证分为预测、规划和工程三个层面。预测采用用户留出与语义留出两种视图：耗时评价 MAE、负对数似然、CRPS、分位数覆盖率和区间宽度；执行概率评价 BCE、AUROC、Brier、未执行召回率和 ECE。统计基线仅从训练集估计，包括全局耗时中位数、单一对数正态分布、总体执行率和固定概率 0.5。仅有一个类别时，AUROC 记为空值。</p>
+<table class="brand cols-3">
+<caption>表 13　规划对照方法</caption>
+  <thead><tr><th>方法</th><th>使用的信息</th><th>决策差别</th></tr></thead><tbody>
+  <tr><td>最早截止优先（EDF）</td><td>初始估时</td><td>最早截止优先</td></tr>
+  <tr><td>优先级 EDF</td><td>初始估时</td><td>优先级与松弛量</td></tr>
+  <tr><td>确定性规划</td><td>学习到的 P50</td><td>评价时将执行概率固定为 1</td></tr>
+  <tr><td>耗时概率规划</td><td>学习到的耗时分布</td><td>采用执行率先验 0.75，以期望损失选择计划</td></tr>
+  <tr><td>全局概率规划</td><td>冻结网络的耗时和执行概率</td><td>使用全局预测，不加入个人历史校准</td></tr>
+  <tr><td>个性化规划</td><td>同上，加上已发生反馈</td><td>在全局预测基础上评价历史反馈校准</td></tr>
+  <tr><td>风险感知对照</td><td>同上</td><td>进一步将 CVaR 纳入风险目标</td></tr>
+  <tr><td>风险感知滚动规划</td><td>集成预测与在线更新</td><td>同时采用风险评价、扰动控制、候选修复及独立复核</td></tr>
+</tbody></table>
+<p>规划评价采用共享离散事件环境。八种方法使用由场景、种子和任务共同确定的潜在执行结果，使比较不受运行顺序影响。压力条件涵盖常态、P95 耗时、连续两次跳过、课表拥挤、晚间执行率下降及新紧急任务。</p>
+<p>评估程序支持以场景为聚类单位进行 2,000 次 Bootstrap。现有历史汇总未附区间数值，因此本节仅作描述性比较。风险感知对照与主方法同时涉及搜索和保护规则差异，比较对象为整套配置；规划内部组合损失的 CVaR 与最终截止损失的 CVaR 分别定义。</p>
+<div class="diagram-page">
+  <img src="figures/eval-replay-chart.png" alt="历史测试回放三面板：加权按时完成率、尾部截止损失 CVaR90 和归一化完成延迟" width="3000" height="1430" >
+<p class="cap">图 10　历史测试回放（350 场景，种子 11，同一检查点）。三个面板依次为优先级加权按时完成率、尾部截止损失 CVaR90 和归一化完成延迟，第三项按正文的归一化受限延迟口径解释。数值沿用历史主表，不代表真人试用或当前 APK 的收益。</p>
+</div>
+<table class="metric brand cols-6">
+<caption>表 14　历史规划回放结果</caption>
+  <thead><tr>
+    <th>方法</th>
+    <th>WOTCR ↑</th>
+    <th>归一化受限延迟 ↓</th>
+    <th>CVaR90 ↓</th>
+    <th>扰动成本† ↓</th>
+    <th>可行性 ↑</th>
+  </tr></thead><tbody>
+  <tr><td>EDF</td><td>67.55%</td><td>0.4362</td><td>0.9481</td><td class="num">34,962</td><td>100%</td></tr>
+  <tr><td>优先级 EDF</td><td>68.26%</td><td>0.4417</td><td>0.9550</td><td class="num">37,474</td><td>100%</td></tr>
+  <tr><td>确定性规划</td><td>69.88%</td><td>0.4297</td><td>0.9007</td><td class="num">35,954</td><td>100%</td></tr>
+  <tr><td>耗时概率</td><td>75.13%</td><td>0.3899</td><td>0.8494</td><td class="num">315,187</td><td>100%</td></tr>
+  <tr><td>全局概率</td><td>75.31%</td><td>0.3881</td><td>0.8598</td><td class="num">328,762</td><td>100%</td></tr>
+  <tr><td>个性化</td><td>74.03%</td><td>0.3953</td><td>0.8377</td><td class="num">320,860</td><td>100%</td></tr>
+  <tr><td>风险感知</td><td>74.58%</td><td>0.3874</td><td>0.8355</td><td class="num">317,024</td><td>100%</td></tr>
+  <tr class="hl"><td>ChronoFlow（主方法）</td><td class="better">79.90%</td><td class="better">0.3770</td><td class="better">0.7516</td><td class="num">165,329</td><td>100%</td></tr>
+</tbody></table>
+<h4>3.1 指标定义与结果解释</h4>
+<table class="line cols-2">
+<caption>表 15　评价指标定义</caption><thead><tr><th>指标</th><th>定义与单位</th></tr></thead><tbody><tr><td>WOTCR</td><td>窗口内到期且按时完成任务的优先级之和，占窗口内全部到期任务优先级之和的比例。逐次计算后汇总有效记录，以百分比表示。</td></tr><tr><td>归一化受限延迟</td><td>对已可见任务计算 [min(完成时刻, 窗口末时刻) − 发布时间] / [窗口末时刻 − 发布时间] 后求均值。该指标无量纲，未完成任务在窗口末截断。</td></tr><tr><td>CVaR90</td><td>各次回放中最差 10% 截止损失的经验均值。截止损失采用优先级加权未按时完成比例，与规划内部组合损失分别定义。</td></tr><tr><td>扰动成本†</td><td>累计时间块起止偏移及新增、删除块的占用分钟，并按原块的临近程度加权。结果表沿用历史汇总值，不解释为每人或每场景的平均移动分钟。</td></tr><tr><td>可行性</td><td>无已检查约束违规的回放记录比例。检查互斥、固定占用、窗口、工作时段、每日容量及连续性，另核验冻结承诺；该指标不代表任务全部按时完成。</td></tr></tbody></table><p>在该历史回放中，主方法的 WOTCR 最高，归一化受限延迟和截止损失 CVaR90 最低。相对全局概率方法，扰动成本降低约 49.71%；但其值仍约为 EDF 的 4.73 倍，体现完成效果与重排成本之间的取舍。</p>
+<p>单独加入个性化校准后，WOTCR 为 74.03%，低于全局概率方法的 75.31%，说明该模块在本记录中并未改善全部指标。主方法同时采用候选搜索、修复、风险评价和保护规则，其结果应作为整套配置评价。</p>
+<p class="note">历史主表与图 10 对应。当前图表附件不包含逐场景记录、完整训练日志和区间统计，因此结论限定于所列回放汇总，不用于推断真实用户效果或总体优越性。</p>
+<table class="line cols-3">
+<caption>表 16　分层验证与证据范围</caption><thead><tr><th>验证对象</th><th>证据</th><th>结论范围</th></tr></thead><tbody><tr><td>Python 与端侧协议</td><td>特征、规划、确认预算与桥接用例</td><td>验证协议与约束逻辑，真机推理另行测试</td></tr><tr><td>Android 工程</td><td>2026-10-18 构建记录及 5 项通过的 JVM 测试</td><td>验证模型打包与工程逻辑，设备性能和安全性分别评估</td></tr><tr><td>方法比较</td><td>350 场景、种子 11 的历史图表与八方法主表</td><td>结论限定于研究回放，手机确认工时模式单独评价</td></tr><tr><td>设备运行</td><td>今天页、日历及任务来源截图</td><td>展示交互状态，性能与长期效果采用独立记录</td></tr><tr><td>数据来源</td><td>划分文件保留模拟标记；执行由回放器生成</td><td>按模拟或数据驱动回放解释，不计为真实用户试验</td></tr></tbody></table>
+
+<p>设备验收使用统一测试账号与同一安装包，依次核验计划来源、约束、反馈和持久化。表 17 为执行协议，具体通过情况以对应设备运行记录为依据。</p>
+<table class="brand cols-3">
+<caption>表 17　设备验收协议</caption>
+  <thead><tr><th>步骤</th><th>操作</th><th>通过标准</th></tr></thead><tbody>
+  <tr><td>1</td><td>测试账号添加两项任务和一段固定课程</td><td>任务和课表都进入当前工作空间</td></tr>
+  <tr><td>2</td><td>关闭可选文本分析和通知采集，点「生成智能计划」</td><td>出现「当前计划：本机智能规划」和分位数</td></tr>
+  <tr><td>3</td><td>查看分位数、课表避让和这项任务的全部未来时间块</td><td>不占用上课时间，确认工时不被重复追加</td></tr>
+  <tr><td>4</td><td>锁定一块，再新增另一项任务并重排</td><td>锁定块的日期和起止不变</td></tr>
+  <tr><td>5</td><td>记录一次完成、跳过或延后，以及实际用时</td><td>时间块结果和整项任务完成分开保存</td></tr>
+  <tr><td>6</td><td>强制停止后重启，再切换账号</td><td>计划恢复；另一个账号看不到这些任务和反馈</td></tr>
+  <tr><td>7</td><td>构造无空档或承诺超出预算</td><td>显示明确提示并保留原计划和锁定块</td></tr>
+</tbody></table>
+
+<h4>3.2 工程优化</h4>
+<table class="line cols-3">
+<caption>表 18　工程问题与优化措施</caption><thead><tr><th>问题</th><th>实现措施</th><th>验证依据</th></tr></thead><tbody><tr><td>预测缓冲与确认预算存在冲突</td><td>按任务整体计算取整预算，扣除受保护承诺后分配剩余空间</td><td>60 分钟与 45 分钟预算用例；超额锁定承诺产生明确冲突</td></tr><tr><td>计划来源与失败状态需要明确</td><td>分别标记模型计划与基础排程，手动生成失败时保留原计划</td><td>设备协议中的来源标识、失败提示与恢复用例</td></tr><tr><td>端侧与研究实现需要保持一致</td><td>按白名单复制生产模块，并附模型元信息与 SHA256</td><td>构建记录与附件中的模型元信息、校验清单</td></tr><tr><td>账号切换可能影响异步状态归属</td><td>按身份持久化，每次调用重建当前工作空间历史</td><td>账号切换与重启恢复协议</td></tr></tbody></table><p>设备性能分别计量模型冷启动、稳定推理和完整规划耗时，并记录任务数、固定占用数、重排次数、内存峰值、设备型号及 Android 版本。预测质量、工程正确性与设备性能分别报告。</p>
+
+<h3>4. 部署方案</h3>
+<p>用户安装 APK 后即可使用内置模型，手机无需另装 Python、Docker 或 PyTorch。构建环境需要 Android SDK 35 和 Python 3.12，运行库支持 arm64-v8a 与 x86_64。模型初始化核验 SHA256；特征维度不符、输出非有限值或约束冲突时返回明确错误。Canvas 同步和可选文本分析分别使用网络连接。</p>
+<table class="cols-2">
+<caption>表 19　部署配置</caption>
+  <thead><tr><th>项目</th><th>配置与运行方式</th></tr></thead><tbody>
+  <tr><td>模型文件</td><td>chronoflow_predictor.onnx，1,375,015 字节，约 1.31 MiB</td></tr>
+  <tr><td>SHA256</td><td>7df73b81f440827ba3bbc6a2977b2769b2f9559ae53b89d31efc683caaa1eaa9</td></tr>
+  <tr><td>运行库</td><td>Chaquopy 17.1.0，ONNX Runtime Android 1.23.2</td></tr>
+  <tr><td>调用路径</td><td>后台线程进入 EmbeddedModelRuntime，不发起 HTTP</td></tr>
+  <tr><td>失败策略</td><td>自动重排失败时保存业务修改并标明基础排程；手动生成失败则保留原计划</td></tr>
+</tbody></table>
+<p>ONNX 权重大小为 1.31 MiB。2026-10-18 的构建记录中，包含 Python 和 ONNX Runtime 运行库的 Debug APK 约为 100.35 MiB。两项数值分别描述模型和安装包体积，推理与规划耗时另行测量。</p>
+<p>安全控制围绕本地存储、账号隔离和外部传输展开。账号切换后，旧请求结果不得写入新身份；各类数据的保存位置、传输范围及授权方式见表 20。演示截图与附件采用去标识数据。</p>
+<table class="soft cols-3">
+<caption>表 20　数据存储与权限控制</caption>
+  <thead><tr><th>数据或能力</th><th>保存与传输</th><th>控制</th></tr></thead><tbody>
+  <tr><td>任务、课表与反馈</td><td>本机加密工作空间；内置规划不上传</td><td>Android Keystore 与 AES-GCM，按身份隔离</td></tr>
+  <tr><td>本机账号</td><td>用户名与盐化密码校验值</td><td>PBKDF2-HMAC-SHA256，不保存明文密码</td></tr>
+  <tr><td>Canvas</td><td>令牌留在本机；请求学校同源 HTTPS</td><td>不索取学校密码，分页和重定向限制同源</td></tr>
+  <tr><td>用户文本接口</td><td>仅将相关文本传至用户选择的服务</td><td>由用户主动启用，密钥置于认证头，退出时清除</td></tr>
+  <tr><td>比赛官方文本接口</td><td>经已配置的官方网关</td><td>开发者密钥只在服务端；手机使用体验码</td></tr>
+  <tr><td>系统通知</td><td>仅处理已授权并命中白名单的通知</td><td>默认关闭，仅采集系统通知，不读取聊天数据库</td></tr>
+</tbody></table>
+
+<h2 class="part" id="value">（五）应用价值与展望</h2>
+<h3>1. 应用场景</h3>
+<p>典型使用场景是一名学生同时处理多门课程的作业、实验和复习，并已在日历中录入固定课表。时序根据核对后的任务、可用空档和每日容量安排未来两周的学习时间，同时展示耗时分位数。新增任务或期限变化时，系统保留锁定及即将开始的安排，在其余时段内修复计划。用户记录完成、跳过或实际用时后，这些反馈参与下一次预测校准与重排。</p>
+<p>任务支持手动录入和学校 Canvas 自动同步，群通知采集作为默认关闭的可选入口。手动任务经表单校验后直接保存；Canvas 和通知信息经发现页核对后转为正式任务，再进入本机规划。</p>
+
+<h3>2. 市场分析</h3>
+<p>教育部《2024 年全国教育事业发展统计公报》显示，2024 年全国高等教育在学总规模为 4,846 万人 <a href="#ref-7">[7]</a>，反映出较大的学生用户基础。时序的初始服务范围更为具体：使用 Android、具有固定课表、需要管理多项截止任务且愿意记录执行反馈的学生。宏观在学规模不直接等同于可服务用户数或付费市场规模。</p>
+<p>相关产品已覆盖待办、日历与自动排程等能力。TickTick 提供待办和日历视图，Motion 强调自动任务安排，Reclaim 将任务转化为可调整的日历时间 <a href="#ref-4">[4]</a><a href="#ref-5">[5]</a><a href="#ref-6">[6]</a>。因此，时序的差异化重点在于课程约束、耗时不确定性、个人反馈和端侧运行的组合，而非自动排程这一单项功能。</p>
+<table class="line cols-2">
+<caption>表 21　服务范围与落地路径</caption><thead><tr><th>维度</th><th>定位与落地路径</th></tr></thead><tbody><tr><td>初始触达</td><td>在课程、班级或学习小组开展自愿试用，分别记录触达、激活、持续反馈与留存，逐步估计服务规模。</td></tr><tr><td>竞争重点</td><td>在已有日历与自动排程能力之上，验证分布预测、个人校准、约束检查及重排复核对学生任务的实际增益。</td></tr><tr><td>体验价值</td><td>用户核对后形成任务，模型给出耗时分位数，规划避开课程并保留锁定承诺；通过来源记录解释延期与取消。</td></tr><tr><td>工程价值</td><td>内置模型降低排程对模型服务器的依赖；联网入口单独授权。实际成本需合并安装包体积、维护与可选服务开销评价。</td></tr><tr><td>增长条件</td><td>Android 覆盖、课程平台适配、反馈持续性和多端需求共同约束服务范围；收入规模以真实转化和付费调查为基础。</td></tr></tbody></table><p>市场验证以持续使用率、计划接受率及排程负担变化为核心，通过校园小范围试用逐步判断需求与留存。算法回放用于评价规划方法，市场规模与付费转化则以实际触达和用户调查为依据。</p>
+
+<h3>3. 成果总结</h3>
+<p>本作品已形成双头预测网络、ONNX 部署模型、在线校准与风险感知滚动规划，并将核心模型和规划代码集成到 Android 安装包。评估入口支持用户留出、语义留出和八种规划对照。</p>
+<p>在 350 个场景、种子 11 的历史回放中，主方法 WOTCR 为 79.90%，较 EDF 和全局概率方法分别高 12.35 与 4.59 个百分点，归一化受限延迟与 CVaR90 均为最低。该结果限定于研究回放模式；手机确认工时模式、设备性能和长期使用效果分别验证。Canvas 同步、通知核对与联网文本分析作为独立能力与核心规划衔接。</p>
+
+<h3>4. 未来规划</h3>
+<p>后续建设围绕 iOS 端适配、多端协同、服务化部署与验证体系展开。首先将同一套预测和规划能力提供给网页端，再通过统一身份与数据版本协议同步任务、时间块和执行反馈。服务稳定后，按负载配置云端资源，同时保留手机离线规划能力。具体方向如下。</p>
+<div class="wide-shot">
+  <img src="figures/shots/web-future.png" alt="时序网页版今日工作台示意：本周计划与待确认">
+</div>
+<p class="cap">图 11　网页版工作台目标示意。网页端通过服务调用预测与规划能力，并与手机端同步任务和反馈。图示为后续建设方向。</p>
+<ol>
+  <li><b>规划服务化。</b>将预测与规划部署为服务，接入网页端「生成智能计划」，与手机端保持一致的模型检查点、特征定义和调用协议。</li>
+  <li><b>iOS 端适配。</b>在现有 Android 端基础上，逐步开发面向 iPhone 的应用，沿用统一的任务、课表和执行反馈数据结构，适配 iOS 的界面交互、权限管理与本地存储。迁移端侧预测与滚动规划能力，验证预测结果一致性、课表避让、锁定保留及离线运行，并通过统一同步协议与 Android、网页端协同。</li>
+  <li><b>跨端数据同步。</b>统一任务、时间块、锁定状态和执行反馈的数据版本，制定明确的冲突合并规则，防止覆盖用户已确认的安排。</li>
+  <li><b>云端运行管理。</b>在服务稳定后按访问量配置资源，完善身份鉴权、租户隔离和密钥管理，并保留本机离线模式。</li>
+  <li><b>验证与结果追溯。</b>以同一安装包验收预算约束、锁定保留和账号隔离，将训练日志、数据划分、检查点和逐场景结果绑定归档。</li>
+  <li><b>外部入口联调。</b>验证学校 Canvas、用户配置的文本接口及通知白名单，保持各入口独立授权、独立关闭。</li>
 </ol>
 
-<h3>5. 当前版本明确不做的事</h3>
-<ul>
-  <li>不读取微信或 QQ 的聊天数据库，不在用户正打开该聊天、系统不再弹通知时补采旧消息。</li>
-  <li>不提供账号、云同步和多设备。卸载或清除数据会删除计划和密钥。</li>
-  <li>不把 DeepSeek 的今日摘要、风险说明和每周复盘直接写回日程。这三类文字只供阅读。</li>
-  <li>不保证排程全局最优。排不下的分钟数以风险提示显示。</li>
-  <li>不把模板评测的准确率写成真实课程群上的准确率。</li>
-</ul>
+<h2 class="part" id="appendix">（六）附录</h2>
+<h3>1. 软件设计资料</h3>
+<p>设计资料与正文图件相互对应：图 2 说明系统层次和数据流，图 3 说明完整方法，图 7 说明候选搜索与复核，图 8 说明任务变更闭环。表 22 提供端侧设计、模型元信息、特征配置与校验清单。</p>
+<table class="line cols-2">
+<caption>表 22　软件设计资料</caption><thead><tr><th>资料</th><th>内容</th></tr></thead><tbody><tr><td><a href="attachments/design/ANDROID_EMBEDDED_MODEL.md">Android 内置模型设计</a></td><td>工程结构、构建依赖、模型打包、确认工时规则及设备验收协议。</td></tr><tr><td><a href="attachments/model/model_metadata.json">模型元数据</a></td><td>模型版本、配置版本、ONNX 名称及训练标记。</td></tr><tr><td><a href="attachments/model/feature_config.json">特征配置</a></td><td>标题、类别、课程、数值与时段特征的固定契约。</td></tr><tr><td><a href="attachments/model/checksums.json">模型校验清单</a></td><td>模型及配置的文件哈希；ONNX 为 1,375,015 字节。</td></tr></tbody></table>
+<h3>2. 核心代码</h3>
+<p>正文代码 1 和代码 2 分别展示耗时分位数计算与历史反馈更新。表 23 链接相关源文件，覆盖网络、特征、损失、预测校准、评价指标及端侧映射。完整应用按 Android 工程目录构建。</p>
+<table class="line cols-2">
+<caption>表 23　核心代码附件</caption><thead><tr><th>附件</th><th>实现内容</th></tr></thead><tbody><tr><td><a href="attachments/code/model/src/chronoflow_model/network.py">network.py</a></td><td>共享任务编码器、耗时头、执行头和分位数计算。</td></tr><tr><td><a href="attachments/code/model/src/chronoflow_model/features.py">features.py</a></td><td>字符哈希、数值缩放与输入特征顺序。</td></tr><tr><td><a href="attachments/code/model/src/chronoflow_model/losses.py">losses.py</a></td><td>带掩码的耗时负对数似然与执行分类损失。</td></tr><tr><td><a href="attachments/code/model/evaluation/predictor.py">predictor.py</a></td><td>冻结网络推理与历史反馈修正。</td></tr><tr><td><a href="attachments/code/model/evaluation/metrics.py">metrics.py</a></td><td>WOTCR、受限延迟、CVaR、扰动及约束检查。</td></tr><tr><td><a href="attachments/code/model/deployment/planning.py">planning.py</a></td><td>端侧任务、课表、确认预算与反馈到规划输入的映射。</td></tr></tbody></table>
 
-<div class="shot">图 1　待插入：今天页截图<br>需能看到当日时间块或空状态。不要包含真实群聊、姓名或 API Key</div>
-<p class="cap">图 1　今天页。请提供手机截图后替换此框。</p>
-
-<h2 class="part">（二）技术架构与创新</h2>
-<h3>1. 总体链路</h3>
-<p>客户端使用 Kotlin 与 Jetpack Compose，最低系统 API 26，编译目标 API 35。领域逻辑不依赖 Android 界面，因此规则解析、不确定性判断和排程可以在普通 JVM 上回归。界面、通知监听、加密存储和网络请求留在 Android 模块。</p>
-<div class="callout">
-三条输入不要画成同一条线。<br>
-群通知或手工录入：白名单或粘贴文本 → 若已启用 DeepSeek，先请求固定地址 <code>https://api.deepseek.com/chat/completions</code>，失败才改用本地规则 → 然后再做 10 分钟去重，重复的不入库 → 首次入库才打不确定性分 → 发现页。打开自动应用时，回退后的规则结果也可能直接创建。<br>
-Canvas 初次同步：只调 Canvas 官方接口，不调用 DeepSeek，按作业、公告、日历转成待确认事项。内容未变则跳过。<br>
-发现页「重新分析」：再次请求 DeepSeek。失败则保留原来的待确认结果，不退回规则。
-</div>
-<p>一条通知最多保留 10 个提案。原始通知列表最多 1000 条，更早的原始通知被截掉，已经确认的任务和日程继续保留。停止采集不会删除已有计划。</p>
-
-<h3>2. 模块职责</h3>
-<table>
-  <tr><th>模块</th><th>输入</th><th>输出</th><th>失败时</th></tr>
-  <tr><td>GroupNotificationListener</td><td>状态栏通知</td><td>标题、会话名、正文、MessagingStyle 消息</td><td>非微信、非 QQ 直接返回</td></tr>
-  <tr><td>NotificationMatcher</td><td>通知信封与白名单</td><td>零条或多条 Incoming</td><td>群名不唯一命中则不采集</td></tr>
-  <tr><td>LocalParser</td><td>正文、接收时间、已有事项</td><td>一条基线 Proposal</td><td>无关键词则 IGNORE</td></tr>
-  <tr><td>DeepSeekClient</td><td>当前通知与同群候选</td><td>最多 10 条 Proposal</td><td>退回 LocalParser</td></tr>
-  <tr><td>UncertaintyEngine</td><td>提案、基线、本地状态</td><td>字段分、问题、autoSafe</td><td>低分则禁止自动执行</td></tr>
-  <tr><td>LocalEngine</td><td>确认后的提案</td><td>任务、日程、通知状态</td><td>目标无效则拒绝写入</td></tr>
-  <tr><td>LocalScheduler</td><td>活动任务与固定日程</td><td>时间块与风险列表</td><td>空档不足则保留缺口</td></tr>
-  <tr><td>PersonalTimeModel</td><td>本机完成记录</td><td>耗时建议与时段分</td><td>没有样本则不给建议</td></tr>
-  <tr><td>EncryptedStore</td><td>LocalState</td><td>local-state.enc</td><td>无法解密则停止覆盖</td></tr>
-</table>
-
-<h3>3. 通知如何变成待确认事项</h3>
-<p>监听服务只处理包名 <code>com.tencent.mm</code> 与 <code>com.tencent.mobileqq</code>。它读取系统提供的标题、会话标题、副标题、普通正文、大文本、文本行，以及 MessagingStyle 里的逐条消息。群摘要标志会被记下，但能否入库仍取决于群名是否精确命中白名单。白名单同时区分应用和群名，避免微信里的「高数群」误收 QQ 里的同名会话。</p>
-<p>匹配时会去掉标题里的「[3条]」「（12条新消息）」一类计数，再与白名单做全等比较。部分系统把群名放在副标题，或放在正文开头并跟着冒号，这两种写法也接受。若多个群名同时命中，本条丢弃，避免把通知分到错误的群。正文超过 10000 字不入库。未开启 AI 时，正文还必须命中作业、实验、截止、延期、会议、调课等关键词，用来挡住明显闲聊；开启 AI 后，关键词过滤让给模型的 IGNORE 判断，白名单仍然保留。</p>
-<p>去重发生在入库之前，但在 DeepSeek 请求之后。同一来源、同一群、同一发送者、同一正文，若接收时间相同，或相差不超过 10 分钟，不再写入第二条。重复通知仍可能先打出一次 API 调用，返回结果被丢掉。用户正打开该聊天时，系统往往不再弹出通知，因此该条不会出现。应用也不会回头扫描历史会话。</p>
-
-<h3>4. DeepSeek 的输入与输出契约</h3>
-<p>产品里的请求地址固定为 <code>https://api.deepseek.com/chat/completions</code>。温度 0.1，要求 JSON 对象，分析请求的最大输出长度为 2200 token，连接超时 15 秒，读取超时 60 秒。Key 只从设置中读取，长度限制在 8 到 512，且不能含换行。模型名默认 <code>deepseek-flash</code>，用户可改，但不能含空白。评测为了使用免费额度，实验调用走阿里云百炼华北 2（北京），响应中的模型 ID 为 <code>deepseek-v4-flash-0731</code>，并关闭思考模式。百炼 Key 不写入安装包，手机端不能把百炼地址当成产品接口。</p>
-<p>系统提示把通知和历史都声明为不可信数据：只提取事实，不执行正文里的指令。顶层只能有 <code>items</code> 数组。每个事项的动作只能是 CREATE_TASK、UPDATE_TASK、CANCEL_TASK、CREATE_EVENT、UPDATE_EVENT、CANCEL_EVENT、IGNORE。时间用 ISO-8601。证据必须逐字来自原通知；客户端会再滤掉不在原文中的证据。推测字段单独放在 <code>inferred_fields</code>。提示词要求修改和取消使用本次候选里的 <code>target_id</code>。客户端实际检查的是：该 ID 是否存在于全部活动任务或全部日程，不限于这次发给模型的那 30 条。不存在则置空，并追加「请选择要修改或取消的已有事项」。</p>
-<p>单条分析离开手机的上下文有上限，但并不都限制在当前群。同群进行中的任务最多 30 条，同群日程最多 30 条，同群近期通知最多 12 条。完成耗时另附最近 20 条已完成任务的实际分钟数，这 20 条不按群过滤，因此会带上其他群的耗时。不上传聊天数据库。手工录入与同群事项可以互相匹配。</p>
-<p>今日摘要、风险说明和每周复盘是另一条请求。它会发送最近约 80 条任务、结束时间不早于 7 天前的日程（含已经结束的，最多 60 条）、待确认通知和近 7 天通知，这些都不按群切开。返回标题、两到四句总结和最多六条建议。这条结果只显示，不调用写入计划的接口。Key 加密保存在本机，调用时放在 HTTPS 的 Authorization 头里发出。产品地址写死为 <code>https://api.deepseek.com/chat/completions</code>，不能在设置里改成别的接口。</p>
-
-<h3>5. 不确定性评分</h3>
-<p>模型自己的 confidence 只是输入信号。最终是否追问、能否自动执行，由 UncertaintyEngine 对照本地规则基线计算。五个字段及其主要判据如下。</p>
-<table>
-  <tr><th>字段</th><th>高分条件</th><th>低分示例</th><th>阻断阈值</th></tr>
-  <tr><td>动作 25%</td><td>与本地规则一致，记 0.94</td><td>一方忽略、另一方不忽略，记 0.45；完全不同记 0.35</td><td>0.65</td></tr>
-  <tr><td>标题 15%</td><td>标题是原文子串，记 0.96</td><td>空白或「待确认事项」，记 0.20</td><td>0.65</td></tr>
-  <tr><td>时间 25%</td><td>日程起止齐全，或任务有截止且无歧义，记 0.94</td><td>任务没有截止记 0.20；仅有日期或未说明上下午记 0.62</td><td>0.70</td></tr>
-  <tr><td>目标 20%</td><td>新建不需要目标，记 0.96；修改且与规则选中同一 ID，记 0.96</td><td>需要目标但 ID 不存在，记 0.10</td><td>0.70</td></tr>
-  <tr><td>证据 15%</td><td>本地规则记 0.90；AI 证据均在原文中，随条数升至最多 0.94</td><td>AI 无证据记 0.35；证据不在原文记 0.30</td><td>0.55，仅 AI</td></tr>
-</table>
-<p>综合分是上述五字段的加权和。引擎自己新提的问题去重后最多两条，例如「明确的截止日期和时间是什么」。模型原来的问题会留在备注里，发现页会把备注全部显示出来。模型最多返回 5 条问题，所以首次入库后屏幕上仍可能看到 5 条模型问题，再加引擎补上的问题。这条评分只包在群通知和手工录入的首次入库上。发现页的「重新分析」直接采用模型返回，不计算字段分。</p>
-<p>首次入库时，自动执行要同时满足：设置里的开关已打开；动作是新建；阻断列表为空；综合分不低于 0.82；没有推测字段；若来自 AI，模型置信度不低于 0.85。修改和取消达不到这个条件。开关默认关闭。未填耗时、正文被截断、疑似多事项，目前都不在阻断词里。只有耗时字段为空时，写入才默认 60 分钟。若正文里已经识别出「2 小时」，即使同时有截断或多事项备注，创建出来的仍是 120 分钟。</p>
-
-<h3>6. 排程</h3>
-<p>LocalScheduler 是最早截止优先的启发式，不证明全局最优，也不证明一定排得下。可用时间默认每天 08:00 至 22:00，存在设置里，结束小时必须晚于开始小时。时区使用用户保存的时区，换地点后可以改成当前手机时区。窗口从「现在」所在日期起共 14 天，步长 30 分钟。</p>
-<p>重排时先保留两类已有时间块：已经结束不超过 30 天的历史块，以及仍属于活动任务、且被锁定或已经开始的块。这两类不挪动。若锁定块超过任务截止，或与固定日程重叠，写入风险，请用户手工处理。固定日程彼此重叠同样只告警，不自动删课。</p>
-<p>空档要同时躲开：当前时刻之前、固定日程、已保留的块，以及执行历史里已经占用过的同一起点。活动任务按截止时间升序，截止相同则优先级高的在前。已保留时长从剩余分钟数里扣掉。可拆分任务按个人时段分从高到低取足够的 30 分钟片；不可拆分任务必须找到一段连续空档，若已经有锁定段则不再拆开，并提示先解锁。选不够时，风险里写明还差多少分钟。</p>
-<p>时段分来自 PersonalTimeModel。一天分成上午 06:00–12:00、下午 12:00–18:00、晚间 18:00–21:00 和夜间。同一任务类型、同一时段的历史完成记 1，推迟记 0.25，跳过记 0。分数为（成功加权 + 2）/（样本数 + 4），没有样本时为 0.5。加 2 和加 4 是为了在记录很少时不要把偶然一次完成当成稳定偏好。</p>
-
-<h3>7. 个人耗时</h3>
-<p>任务类型可自动归类为编程、实验、报告、复习、记忆、阅读或其他，用户也可以指定。耗时建议只在已有完成记录时出现。样本有两类，合在一起用：已完成任务取「实际耗时 ÷ 初始估时」；时间块记录取「实际分钟 ÷ 该块计划分钟」。比值先裁到 0.25 至 4，再按「全部历史 → 同类型 → 同群同类型 → 难度相差不超过 1」做后验收缩，上一层结果是下一层的先验。最终倍数限制在 0.5 到 3，建议分钟数为当前估时乘以该倍数，再取整到 5 分钟。样本不足时退回更粗的一层，界面会写明依据来自哪一层。</p>
-<p>另外三类风险不依赖大模型。截止在 24 小时内、但截止前排进的分钟数仍小于剩余工作量；历史实际用时超过当前估计的 1.25 倍；同一任务的截止时间已经变更至少两次。DeepSeek 的风险说明可以引用这些本地结论，但不能凭空增加未提供的数据。</p>
-
-<h3>8. 存储与密钥</h3>
-<p>状态序列化为 schema 2 的 JSON，再用 AES-GCM 加密。密钥别名 <code>chronoflow-local-v1</code>，放在 Android Keystore，只允许加密和解密，不导出。密文前 12 字节是 IV，认证标签 128 位。文件名为应用私有目录中的 <code>local-state.enc</code>，写入使用 AtomicFile：先写临时内容，成功后替换，失败则放弃本次写入。解密失败时停止保存，避免用空状态覆盖已有计划。API Key 和 Canvas Token 在同一份加密状态里，不单独放进明文配置。</p>
-<p>执行历史最多保留最近 2000 条。单次实际用时和任务总预计都限制在 1 到 20160 分钟，也就是两周。标题 1 到 200 字。</p>
-
-<h3>9. 什么会离开手机</h3>
-<table>
-  <tr><th>数据</th><th>默认</th><th>离开手机的条件</th><th>去向</th></tr>
-  <tr><td>白名单群的新通知正文</td><td>只在本机解析</td><td>设置中启用 DeepSeek 且 Key 非空</td><td>固定地址 api.deepseek.com，Key 放在 HTTPS 认证头</td></tr>
-  <tr><td>同群进行中的任务、日程、近期通知</td><td>留在本机</td><td>分析当前通知时，各最多 30 / 30 / 12 条</td><td>同上</td></tr>
-  <tr><td>已完成任务的实际耗时</td><td>留在本机</td><td>分析时附最近 20 条，不按群过滤</td><td>同上</td></tr>
-  <tr><td>跨群任务、近 7 天内结束或尚未结束的日程、近期通知</td><td>留在本机</td><td>生成今日摘要、风险说明或每周复盘时发送；日程最多 60 条</td><td>同上</td></tr>
-  <tr><td>其他群的聊天原文</td><td>不采集</td><td>不上传聊天数据库</td><td>—</td></tr>
-  <tr><td>Canvas 作业与日历</td><td>不连接</td><td>用户填写主机与 Token 后同步；若再打开 DeepSeek，已确认内容可能进入上面的复盘请求</td><td>Canvas 主机，以及可选的 DeepSeek</td></tr>
-  <tr><td>API Key 与加密文件</td><td>Key 与计划一起加密存在本机</td><td>调用时 Key 进入 HTTPS 认证头，不写入提示词正文；密文文件本身不上传</td><td>认证头发往 api.deepseek.com</td></tr>
-</table>
-
-<h3>10. 相对常见实现的差异</h3>
-<ol>
-  <li>采集边界写在模型之前。包名、白名单和去重都不依赖大模型是否可用。</li>
-  <li>首次入库的 AI 提案会跟一条本地规则基线比较。两者动作不一致时，动作分下降。重新分析这条入口目前不比较。</li>
-  <li>证据过滤在客户端再做一次。提示词要求逐字引用，解析时仍丢弃不在原文中的片段。</li>
-  <li>排程读的是确认后的任务和日程，不直接读模型 JSON。模型不可用时，手工确认的事项仍能重排。</li>
-  <li>个人时段和耗时使用带先验的小样本估计，并在界面写出依据来自哪一层历史。比值来自实际耗时除以初始估时，以及时间块的实际分钟除以计划分钟。</li>
-</ol>
-
-<h3>11. 与 0.4.0 源码核对后的已知差距</h3>
-<p>2026-10-13 用当前安装包对应的源码复核了上文。白名单采集、确认写入、14 天与 30 分钟排程、加密存储、Canvas 和个人令牌、非精确提醒，与实现一致。57 项核心检查可以通过。下面几条是方案原先写严了、代码尚未做到的地方，以代码为准。</p>
-<table>
-  <tr><th>项目</th><th>0.4.0 实际行为</th></tr>
-  <tr><td>自动执行</td><td>打开开关后，未填耗时、正文截断、疑似多事项仍可能直接创建。只有耗时缺失才默认 60 分钟；已识别出 2 小时则创建 120 分钟的任务。</td></tr>
-  <tr><td>重新分析</td><td>发现页该入口不经过 UncertaintyEngine，没有字段分，问题也不限制为两条。</td></tr>
-  <tr><td>上传范围</td><td>单条分析会带上其他群的完成耗时。摘要、风险和复盘会发送跨群计划。聊天数据库仍然不读。</td></tr>
-  <tr><td>修改或取消的目标</td><td>只校验 ID 存在于本地状态，不限制为本次发给模型的候选列表。</td></tr>
-  <tr><td>去重与请求的顺序</td><td>先请求模型，再丢弃 10 分钟内的重复通知。重复项可能仍产生 API 调用。</td></tr>
-  <tr><td>截止变更次数</td><td>截止被锁定、保存下来的日期没有变时，只要提案里的截止与原截止不同，接受后变更次数仍加一。</td></tr>
-</table>
-<p>这六条准备在初赛后改代码。改之前，对外演示不要打开「自动应用明确的新建事项」，重新分析的结果仍请在发现页看完再确认。评测表里的 0.964 是抽取实验的动作分数，不是这六条已经修好的证据。</p>
-
-<h2 class="part">主流程图</h2>
-<p>下面整页留给流程图，请分成三路，不要画成「所有输入都先去重、再请求模型」。第一路是群通知和手工录入：过滤之后若开启了 DeepSeek，先请求，失败才用规则，然后才去重。第二路是 Canvas 初次同步：不请求 DeepSeek。第三路是重新分析：请求失败则保留原待确认项。图中不要出现真实群名、Key 或学校标识。</p>
-<div class="flow">图 2　待插入：主业务流程图<br><br>整页替换此框。<br>请分三路：群通知/手工录入、Canvas 初次同步、重新分析。<br>群通知一路是先请求模型，再去重。</div>
-<p class="cap">图 2　主流程。插入后可删掉本页说明段，只保留图和一行图题。</p>
-
-<h2 class="part">（三）功能设计与实现</h2>
-<h3>1. 本地规则如何读一句通知</h3>
-<p>LocalParser 不调用网络。它先用同一套关键词判断这句话像不像课程事项，不像则动作为忽略，理由是「未发现明确的任务或日程关键词」。像的话，再以该条通知的接收时间和用户时区为参照，解析日期和钟点。</p>
-<p>日期支持三种写法。绝对日期如「10月20日」或「2026-10-20」，非法月日会记「日期无效」。相对日期里，「今天 / 今日 / 今晚」是当天，「明天 / 明日」加一天，「后天」加两天。星期写法里，「下周一」在目标星期上再加 7 天；单独说「周一」且该星期已经过去，则推到下一周；「本周 / 这周」不因已过去而再加 7 天。一句话里出现多个日期时，取文中位置最靠后的那个，并追加「包含多个日期，请核对」。</p>
-<p>钟点支持「18:00」「三点」「3点半」「15时」。出现「下午 / 晚上 / 晚间」且小时在 1 到 11，则加 12；「中午」且小时在 1 到 10，同样加 12；「凌晨 12 点」记为 0 点。如果小时在 1 到 11、没有分钟冒号、也没有任何上午下午，则记「未说明上午或下午」。后一个钟点可以继承前一个时段，这样「下午三点到四点」的四点仍是 16:00。无法组成合法时间则要求手填。</p>
-<p>动作按词和已有事项一起决定。「延期、改到、改为、提前、推迟、延长、调整到」视为修改。「取消、不用交、无需提交、不用提交」视为取消，但如果这句话同时像修改，则优先按修改，避免「不用周五交了，改到下周一」被当成取消。含有考试、会议、班会、上课、调课、讲座、答辩，且不像作业提交，则视为日程，否则视为任务。同一群里若已有标题能对上的活动事项，而这句话又没有明确的修改或取消词，仍提议修改，并写上「已有相似事项，请确认是修改还是新建」。对得上多条或一条都对不上时，不猜测 ID，要求用户选择。</p>
-<p>标题优先沿用唯一命中的已有事项名称。否则抽取「实验三」「作业1」「报告二」这类片段；再不行就去掉称呼、日期、钟点和「预计两小时」，截到「截止」「延期」之前，最长 120 字。抽空了则标题为「待确认事项」，并要求补充。耗时识别「预计 / 耗时 / 需要 / 用时」后面的小时或分钟，范围 1 到 20160。新建任务没写耗时时，先按 60 分钟暂记并要求核对。只有日期、没有钟点的任务截止，暂记当天 23:59，同样要求核对。日程必须有开始；结束可以来自第二个钟点，或由开始加上耗时推出。结束不晚于开始时，提示可能跨天并把结束清空。</p>
-<p>本地规则自己的 autoSafe 只在新建、且没有任何核对备注、时间字段齐全时为真。备注里一旦有「请核对」「请选择目标」「可能包含多个事项」或截断提示，规则层会把 autoSafe 设为假。首次入库时这个标志会被 UncertaintyEngine 的综合分覆盖，所以上面三类备注目前挡不住自动执行。规则本身不拆分多事项，只在出现「另外、同时、以及、还有、分别」或分号、换行时提示建议拆开。多事项拆分交给 DeepSeek。</p>
-
-<h3>2. 七类句子的预期</h3>
-<table>
-  <tr><th>输入</th><th>预期动作</th><th>还需要核对的点</th></tr>
-  <tr><td>实验三明天 18:00 前提交，预计 2 小时</td><td>新建任务</td><td>若同群已有「实验三」，改为修改并请确认</td></tr>
-  <tr><td>实验三周五之前提交</td><td>新建或修改任务</td><td>钟点暂按 23:59</td></tr>
-  <tr><td>明天下午三点到四点开班会</td><td>新建日程</td><td>起止为 15:00–16:00</td></tr>
-  <tr><td>不用周五交了，改到下周一 18:00</td><td>修改原任务</td><td>必须命中一条已有任务</td></tr>
-  <tr><td>实验三取消，不用交了</td><td>取消原任务</td><td>取消始终要确认</td></tr>
-  <tr><td>明天三点开会</td><td>新建日程</td><td>上午或下午不明</td></tr>
-  <tr><td>晚上有人吃饭吗</td><td>忽略</td><td>无课程关键词；开启 AI 后仍可能由模型判为忽略</td></tr>
-</table>
-<p>相对时间按该条的接收时间计算。评测把时区固定为 Asia/Shanghai，避免手机当前时区改变同一句的标准答案。</p>
-
-<div class="twocol">
-  <div>
-    <div class="shot">图 3　待插入：发现页<br>一条待确认事项，能看到动作、时间和核对问题</div>
-    <p class="cap">图 3　发现页。</p>
-  </div>
-  <div>
-    <div class="shot">图 4　待插入：延期确认<br>应显示修改原任务，而不是新建第二条</div>
-    <p class="cap">图 4　延期后的确认。</p>
-  </div>
-</div>
-
-<h3>3. 确认之后写进哪里</h3>
-<p>每条待确认通知只能应用一次。应用时按动作分支：新建任务使用提案标题、截止和耗时，耗时缺省 60 分钟，子任务最多来自模型给出的 8 条短标题；修改任务时，若用户锁了截止时间则不覆盖截止，耗时变化会按已完成部分回算剩余分钟。变更次数的条件是「提案中的截止非空，且与任务上现有截止不同」，没有再判断锁定后日期是否真的写进去了。因此截止已锁定、日期保持不变时，接受一条延期提案仍会把次数加一。取消任务只改状态，不物理删除。新建日程要求结束晚于开始。取消日程会从列表移除。忽略不改计划，也不触发重排。其他成功写入都会立刻重排未来 14 天。</p>
-<p>用户也可以在任务页和日历里直接改名称、耗时、优先级、难度和是否可拆分。这些编辑同样触发重排。完成某一时间块时，可以记录实际分钟数，结果进入个人时间模型；剩余分钟扣到 0 则任务变为已完成。</p>
-
-<h3>4. 今天、日历与提醒</h3>
-<p>今天页按所选日期列出固定日程和任务时间块，并显示当日计划专注时长。本地风险出现在同一页，例如 24 小时内仍未排完、估时偏低、截止反复变化。今日摘要、风险预测和每周复盘只有在 DeepSeek 可用时生成，生成失败不影响日程本身。</p>
-<p>日历可以按天切换。固定日程与排出来的任务块用不同条目显示。锁定某一块之后，下次重排不会挪动它。提醒使用系统普通通知渠道，不是精确闹钟。省电策略和厂商后台限制可能让提醒晚于时间块的开始，这一点在设置说明里写明，不把它当成已验证的准时率。</p>
-
-<div class="twocol">
-  <div>
-    <div class="shot">图 5　待插入：任务页<br>能看到截止、剩余时间或完成入口</div>
-    <p class="cap">图 5　任务列表。</p>
-  </div>
-  <div>
-    <div class="shot">图 6　待插入：日历<br>含固定课和排出来的时间块</div>
-    <p class="cap">图 6　日历与排程。</p>
-  </div>
-</div>
-
-<h3>5. Canvas 与设置</h3>
-<p>Canvas 同步使用用户自己的站点地址和个人 Access Token，请求只发往该 HTTPS 主机。应用不接收 Canvas 密码。拉到的作业、公告和日历事件转成与群通知相同的待确认事项，确认后才进入计划。若学校禁用个人令牌，需要管理员发放 Developer Key 才能改走 OAuth；当前版本没有内置这套管理员密钥，此时应停用 Canvas，继续使用群通知和手工录入。</p>
-<p>设置页包含：开始或停止采集、白名单群名、自动应用明确新建事项的开关、每日可用时段、时区、提醒开关、DeepSeek 开关、Key、模型名，以及 Canvas 主机和 Token。Key 和 Token 用密码框录入。保存后的说明写明：请求会产生 DeepSeek 费用，AI 结果仍先进入「发现」。</p>
-<div class="shot">图 7　待插入：设置页<br>白名单和 DeepSeek 开关。不要拍到 API Key、Token 或真实群全名</div>
-<p class="cap">图 7　设置。Key 输入框请打码或保持为空。</p>
-
-<h3>6. 界面上的失败表现</h3>
-<table>
-  <tr><th>情况</th><th>用户能看到的结果</th><th>计划是否被改写</th></tr>
-  <tr><td>未开采集</td><td>状态栏提示已收到通知，但采集未开启</td><td>否</td></tr>
-  <tr><td>群名不在白名单</td><td>提示未匹配白名单或关键词</td><td>否</td></tr>
-  <tr><td>10 分钟内重复</td><td>不新增待确认</td><td>否</td></tr>
-  <tr><td>首次分析超时或返回无法解析</td><td>提示已改用本地规则</td><td>若自动应用开着，回退结果仍可能直接创建</td></tr>
-  <tr><td>重新分析失败</td><td>保留原来的待确认结果，不改成规则结果</td><td>否</td></tr>
-  <tr><td>目标事项已被取消</td><td>确认时拒绝，要求重选</td><td>否</td></tr>
-  <tr><td>加密文件无法解密</td><td>停止写入并提示查看存储状态</td><td>不覆盖旧文件</td></tr>
-  <tr><td>14 天内空档不够</td><td>风险里写明还差的分钟数</td><td>已排上的块保留</td></tr>
-</table>
-
-<h2 class="part">（四）开发测试与部署</h2>
-<h3>1. 开发顺序与已完成检查</h3>
-<p>实现顺序是先保证离线闭环，再把大模型当作可选增强。通知过滤、确认、加密存储、任务、排程和提醒可以在没有 API Key 时使用。DeepSeek 是后加的一层。只有群通知和手工录入的第一次分析失败时，才退回 LocalParser 并再打不确定性分；这时如果自动应用开着，回退结果也可能直接创建。重新分析失败不会替换原结果，也不退回规则。</p>
-<p>领域逻辑有 57 项核心检查，覆盖日期解析、延期与取消、白名单匹配、排程冲突和截止约束，其中包括多组随机排程：锁定块不被挪动、固定日程不被任务占用、不可拆分任务不会被切成碎片。这些检查在 JVM 上运行，不依赖真机通知。Debug 安装包版本 0.4.0（versionCode 4），已在一台 Android 真机安装。本文不记录机型。真机上仍需补测的项目包括：不同系统对通知正文的折叠、隐藏通知内容时的漏采、省电策略下提醒是否延迟，以及进程被杀掉后加密文件能否读回。这些项在补测完成前列为待测，不写成已通过的百分比。</p>
-
-<h3>2. 评测数据 synthetic-v1</h3>
-<p>开发集 400 条，封闭测试 100 条。文本由固定模板生成，课程、教师和群名使用占位符。开发集与测试集的标题、课程、群和日期起点分开：开发集日期从 2026-09-07 附近开始，测试集从 2026-11-02 附近开始，两套文本没有重复。标准答案由生成脚本同时写出，标注员字段为 template-generator，<code>adjudicated</code> 为 false。因此它能比较规则和模型在受控句式上的差别，不能代替双人标注，也不能代替真人试用。</p>
-<table>
-  <tr><th>场景</th><th class="num">开发集</th><th class="num">封闭测试</th></tr>
-  <tr><td>新建任务</td><td class="num">90</td><td class="num">25</td></tr>
-  <tr><td>延期、修改或取消</td><td class="num">70</td><td class="num">15</td></tr>
-  <tr><td>日程</td><td class="num">60</td><td class="num">15</td></tr>
-  <tr><td>一条通知多个事项</td><td class="num">50</td><td class="num">15</td></tr>
-  <tr><td>模糊或不完整</td><td class="num">50</td><td class="num">15</td></tr>
-  <tr><td>无关信息</td><td class="num">50</td><td class="num">15</td></tr>
-  <tr><td>截断、错别字等困难样本</td><td class="num">30</td><td class="num">—</td></tr>
-  <tr><td>合计</td><td class="num">400</td><td class="num">100</td></tr>
-</table>
-<p class="note">来源按整集配平：微信 45%，QQ 30%，Canvas 15%，手工 10%。这是模板配比，不是真实使用比例。困难样本只放在开发集，避免用同一类压力句同时调参和报最终分数。</p>
-<p>动作标签共七种，与产品一致。标注约定：「改到下周一」是修改任务，不是先取消再新建；「取消，不用交」是取消；「明天可能开会」属于不确定，应追问；闲聊是忽略；两件独立事项应产生两个条目。证据必须是原文子串。时间比较精确到分钟，23:59:00 与 23:59:59 视为相同。</p>
-
-<h3>3. 五个系统分别做什么</h3>
-<p>五个系统不是五次独立调参，也不都是五次 API 调用。</p>
-<table>
-  <tr><th>系统</th><th>识别从哪来</th><th>额外处理</th><th>能否自动执行</th></tr>
-  <tr><td>规则</td><td>只跑 LocalParser</td><td>无模型</td><td>按规则自身的 autoSafe</td></tr>
-  <tr><td>DeepSeek</td><td>原始 JSON</td><td>保留无效证据和无效目标 ID</td><td>实验中强制为否</td></tr>
-  <tr><td>+证据</td><td>同一次原始 JSON</td><td>丢掉不在原文中的证据</td><td>否</td></tr>
-  <tr><td>+目标</td><td>同一次原始 JSON</td><td>再丢掉无效 target_id</td><td>否</td></tr>
-  <tr><td>完整系统</td><td>同一次原始 JSON</td><td>再跑产品里的 UncertaintyEngine</td><td>由评分和阈值决定</td></tr>
-</table>
-<p>因此后四列的动作、标题和时间相同，是实验设计，不是表格复制错误。安全层决定的是证据是否有效、目标能否使用、追问是否被换成引擎自己的问题，以及能否自动执行。它不重写模型已经输出的动作和时间。评委对照表时应把「规则」和「完整系统」当作主要对比，把中间三列当作同一识别结果上的安全处理。</p>
-
-<h3>4. 指标</h3>
-<table>
-  <tr><th>指标</th><th>怎么算</th></tr>
-  <tr><td>动作 Macro-F1</td><td>七种动作里实际出现的类别，先算各类 F1 再平均</td></tr>
-  <tr><td>标题准确率</td><td>动作匹配成功后，标题规范化再比较</td></tr>
-  <tr><td>时间准确率</td><td>精确到分钟。任务看截止，日程看起止</td></tr>
-  <tr><td>目标匹配</td><td>需要关联已有事项时，ID 是否正确</td></tr>
-  <tr><td>多事项 F1</td><td>一条通知对应多个标准事项时的匹配</td></tr>
-  <tr><td>无关误报率</td><td>标准动作为忽略、系统却产出事项的比例</td></tr>
-  <tr><td>追问召回率</td><td>标准答案要求追问时，系统是否提出问题</td></tr>
-  <tr><td>幻觉率</td><td>标题既不在原文也不在候选标题中，或证据不是原文子串</td></tr>
-  <tr><td>自动执行覆盖率</td><td>被标为可自动执行的样本比例</td></tr>
-  <tr><td>错误自动执行率</td><td>在已自动执行的样本中，与标准答案不一致的比例。没有自动执行时分母为空，表中写「—」</td></tr>
-</table>
-
-<h3>5. 冻结</h3>
-<p>开发集用于观察方向。看完开发集分数之后冻结，冻结日 2026-10-12。冻结内容包括：Git 提交 <code>e6cd0b3</code> 所对应的产品规则、评测脚本文件的 SHA-256、模型 <code>deepseek-v4-flash-0731</code>、温度 0.1、思考模式关闭、时区 Asia/Shanghai。此后没有再改提示词、规则和阈值。封闭测试只读取不含标准答案的输入文件。规则系统跑 1 次。同一批 100 条向百炼请求 3 次，用来看动作是否稳定，99 条三次动作一致。DeepSeek、证据、目标和完整系统都从第 1 次原始返回派生，避免把三次调用的随机差异混进安全层对比。接口错误为 0，因此「失败后成功降级」的比例没有测到，本文不报告该比例。</p>
-<p>提交 <code>e6cd0b3</code> 当时只有开发集和封闭测试输入。评分程序、冻结记录、预测文件、原始响应和评分 JSON 随后放进仓库的 <code>evaluation/</code>。Macro-F1 只平均实际出现过的动作，对齐先按「动作 + 去空白标题」，再按动作。开发集带标准答案，可以在本地重算。封闭测试标准答案不入库，因此可以核对预测哈希，不能在没有金标准的机器上重算 0.964。仓库里没有 API Key。</p>
-
-<h3>6. 封闭测试结果</h3>
-<p>下表为正式结果，n = 100。数字来自冻结后的一次性评分。</p>
-<table>
-  <tr><th>指标</th><th class="num">规则</th><th class="num">DeepSeek</th><th class="num">+证据</th><th class="num">+目标</th><th class="num">完整系统</th></tr>
-  <tr><td>动作 Macro-F1</td><td class="num">0.765</td><td class="num">0.964</td><td class="num">0.964</td><td class="num">0.964</td><td class="num">0.964</td></tr>
-  <tr><td>标题准确率</td><td class="num">0.260</td><td class="num">0.459</td><td class="num">0.459</td><td class="num">0.459</td><td class="num">0.459</td></tr>
-  <tr><td>时间准确率</td><td class="num">0.904</td><td class="num">0.862</td><td class="num">0.862</td><td class="num">0.862</td><td class="num">0.862</td></tr>
-  <tr><td>目标匹配</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td></tr>
-  <tr><td>多事项 F1</td><td class="num">0.000</td><td class="num">0.333</td><td class="num">0.333</td><td class="num">0.333</td><td class="num">0.333</td></tr>
-  <tr><td>无关误报率</td><td class="num">0.067</td><td class="num">0.000</td><td class="num">0.000</td><td class="num">0.000</td><td class="num">0.000</td></tr>
-  <tr><td>追问召回率</td><td class="num">0.000</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">0.467</td></tr>
-  <tr><td>幻觉率</td><td class="num">0.300</td><td class="num">0.280</td><td class="num">0.280</td><td class="num">0.280</td><td class="num">0.280</td></tr>
-  <tr><td>自动执行覆盖率</td><td class="num">0.120</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
-  <tr><td>错误自动执行率</td><td class="num">1.000</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
-</table>
-<div class="bars">
-  <div class="bar-row"><span class="bar-name">规则 F1</span><div class="track"><div class="fill alt" style="width:76.5%"></div></div><span class="bar-val">0.77</span></div>
-  <div class="bar-row"><span class="bar-name">完整系统 F1</span><div class="track"><div class="fill" style="width:96.4%"></div></div><span class="bar-val">0.96</span></div>
-  <div class="bar-row"><span class="bar-name">规则误报</span><div class="track"><div class="fill alt" style="width:6.7%"></div></div><span class="bar-val">0.07</span></div>
-  <div class="bar-row"><span class="bar-name">完整系统误报</span><div class="track"><div class="fill" style="width:0.8%"></div></div><span class="bar-val">0.00</span></div>
-</div>
-<p>平均每条约 326 个输入 token、159 个输出 token。模型路径 P95 延迟约 3.1 秒，规则路径 P95 为 1 毫秒。三次请求的动作一致率为 99/100。</p>
-<p>规则系统自动执行了 12 条，这 12 条全部与标准答案不一致，所以错误自动执行率是 1.00。DeepSeek 列按实验规定不自动执行。完整系统在这 100 条上也没有放行任何自动执行，因此没有错误自动执行率的分母。修改和取消没有被自动写入。这个结果支持的结论是：在该批模板句上，完整系统比规则更少把无关句子写成事项，也没有发生错误的自动写入。它不支持「每加一层安全处理，错误自动执行就下降一截」，因为模型路径的自动执行覆盖率一直是 0。</p>
-<p>证据校验和目标校验没有改变动作、标题和时间。幻觉主要来自标题多写了原文里没有的「提交」「完成」；证据过滤不会改标题。目标 ID 在动作已经匹配成功时就是对的，所以目标校验没有新的可修正样本。完整系统把追问召回率从 1.00 降到 0.467，因为评分看的是引擎写入 <code>questions</code> 的问题，最多两条；模型原问题若只留在备注里，这次召回可以不计。时间准确率仍是规则更高：0.904 对 0.862。模型更擅长动作和多事项，不更擅长钟点。</p>
-
-<h3>7. 冻结前的开发集</h3>
-<p>开发集 n = 400，允许在看分数之后修改系统，所以只作对照，不与封闭测试混成一个总分。</p>
-<table>
-  <tr><th>指标</th><th class="num">规则</th><th class="num">DeepSeek</th><th class="num">+证据</th><th class="num">+目标</th><th class="num">完整系统</th></tr>
-  <tr><td>动作 Macro-F1</td><td class="num">0.828</td><td class="num">0.963</td><td class="num">0.963</td><td class="num">0.963</td><td class="num">0.963</td></tr>
-  <tr><td>标题准确率</td><td class="num">0.480</td><td class="num">0.599</td><td class="num">0.599</td><td class="num">0.599</td><td class="num">0.599</td></tr>
-  <tr><td>时间准确率</td><td class="num">0.911</td><td class="num">0.877</td><td class="num">0.877</td><td class="num">0.877</td><td class="num">0.877</td></tr>
-  <tr><td>目标匹配</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td></tr>
-  <tr><td>多事项 F1</td><td class="num">0.160</td><td class="num">0.560</td><td class="num">0.560</td><td class="num">0.560</td><td class="num">0.560</td></tr>
-  <tr><td>无关误报率</td><td class="num">0.120</td><td class="num">0.020</td><td class="num">0.020</td><td class="num">0.020</td><td class="num">0.020</td></tr>
-  <tr><td>追问召回率</td><td class="num">0.000</td><td class="num">0.983</td><td class="num">0.983</td><td class="num">0.983</td><td class="num">0.517</td></tr>
-  <tr><td>幻觉率</td><td class="num">0.155</td><td class="num">0.203</td><td class="num">0.198</td><td class="num">0.198</td><td class="num">0.198</td></tr>
-  <tr><td>自动执行覆盖率</td><td class="num">0.148</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
-  <tr><td>错误自动执行率</td><td class="num">0.627</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
-</table>
-<p>方向与封闭测试一致：完整系统的动作 F1 和无关误报更好，规则的时间更准，标题和多事项仍然是短板。开发集上证据过滤把幻觉率从 0.203 降到 0.198，只影响证据片段，标题幻觉还在。规则系统自动执行覆盖率 0.148，其中错误比例 0.627。模型路径 P95 约 3.2 秒，平均约 330 个输入 token 与 161 个输出 token。</p>
-
-<h3>8. 结果边界</h3>
-<ul>
-  <li>标题准确率在封闭测试只有 0.459，幻觉率 0.280，多事项 F1 0.333。动作分高，不表示事项名称已经可用。</li>
-  <li>样本是模板句，句式比真实群聊更整齐，错别字、截断和表情较少。困难样本没有进入封闭测试。</li>
-  <li>目标匹配为 1.000，只说明在这批样本的候选列表里 ID 没有配错，不能外推到候选很多、标题很像的真实任务列表。</li>
-  <li>接口失败降级未测。真机通知采集率和提醒准时率未测。</li>
-  <li>若以后修改提示词、阈值或规则，必须重新冻结并重跑封闭测试，不能只改本表。</li>
-</ul>
-
-<h3>9. 给评委的安装与操作</h3>
-<p>评审方式是安装 Android 调试包。网页初稿只监听本机 <code>127.0.0.1</code>，没有账号，不能作为评委登录入口。手机端首次打开也没有登录页，没有示例数据。</p>
-<ol>
-  <li>系统为 Android 8.0 及以上。允许安装未知来源的调试包。</li>
-  <li>打开应用，在设置中添加微信或 QQ 的群名。群名需与通知标题一致。</li>
-  <li>到系统设置授予通知使用权，回到应用打开「开始采集群通知」。</li>
-  <li>若暂时不能授权，使用「发现 → 录入通知」粘贴一句作业或改期文本。</li>
-  <li>在发现页核对动作、时间和目标，确认后到任务页和日历查看。</li>
-  <li>再录入一条延期，确认修改的是原来那条。</li>
-  <li>DeepSeek 保持关闭即可完成上述路径。若打开，需评委自己的 Key，不要使用材料包里的密钥，材料包中也不应放入密钥。</li>
-</ol>
-<p class="note">待补充：评审用 APK 的网盘路径和 SHA-256。</p>
-<div class="shot">图 8　待插入：录入通知或确认成功后的任务变化<br>演示「录入 → 确认 → 任务出现」即可，不要包含真实聊天</div>
-<p class="cap">图 8　手工录入后的结果。可与图 3、图 4 搭配，作为无通知权限时的评审路径。</p>
-
-<h2 class="part">（五）应用价值与展望</h2>
-<h3>1. 四条场景走查</h3>
-<p>场景一，作业截止。群里出现「实验三明天 18:00 前提交，预计 2 小时」。白名单命中后进入发现。确认后任务列表出现该作业，日历在截止前安排约 2 小时，并避开已经添加的固定课。若当天空档不足，风险提示剩余分钟，而不是悄悄排到截止之后。</p>
-<p>场景二，临时改期。同一群随后说改到下周一 18:00。规则会把「改到」认成修改，并按「实验三」匹配原任务。确认后更新截止和变更次数，不新增第二条作业。若匹配到多条，确认页要求选择，不默认第一条。</p>
-<p>场景三，临时班会。通知给出明天下午三点到四点。系统记为固定日程。之后的作业重排会让开这一小时。班会本身不占用「剩余工作分钟」。</p>
-<p>场景四，无关闲聊。未开启 AI 时，没有课程关键词的句子在匹配阶段就被滤掉。开启 AI 后，模型可以返回 IGNORE，发现页不把它放进待确认。封闭测试里，完整系统对无关句的误报率为 0；这仍是模板句上的结果。</p>
-
-<h3>2. 试用方案与占位数字</h3>
-<p>计划中的真人试用尚未执行。设计是：招募约 15 名使用 Android 与微信或 QQ 课程群的成年学生，连续 14 天。第 1–4 天沿用各人原来的手工记录作为基线，第 5–12 天使用时序，第 13–14 天填写问卷。每人记录：收到的课程通知数、应用采到的条数、确认后保留的条数、用户改过的条数、每条整理耗时、遗漏的重要事项、截止时间录入错误、是否按时开始。中途退出要记下原因，不把退出者的空白周算成零遗漏。问卷包含 SUS、是否愿意继续使用，以及一条最有用功能和一条最严重问题的原话。下面的表先按这个结构填了圆整数，方便排版。提交前整节替换。</p>
-<div class="sim">
-  <strong>以下数字和引语全部是模拟占位，不是真人记录。</strong>
-  模拟写成 15 人招募、12 人完成、3 人退出（2 人课程通知过少，1 人中途卸载）。这些数不能写入报名简介，也不能画成正式的用户效果图。
-</div>
-<table>
-  <tr><th>指标</th><th class="num">基线期（模拟）</th><th class="num">使用期（模拟）</th></tr>
-  <tr><td>完成人数</td><td class="num">12</td><td class="num">12</td></tr>
-  <tr><td>每条通知平均整理时间</td><td class="num">90 秒</td><td class="num">30 秒</td></tr>
-  <tr><td>每周遗漏的重要事项</td><td class="num">3.0 条/人</td><td class="num">1.2 条/人</td></tr>
-  <tr><td>截止时间录入错误</td><td class="num">2.0 次/人/周</td><td class="num">0.8 次/人/周</td></tr>
-  <tr><td>按时完成率</td><td class="num">70%</td><td class="num">82%</td></tr>
-  <tr><td>每日手工调整次数</td><td class="num">4 次</td><td class="num">2 次</td></tr>
-  <tr><td>主观负担（1–5，越高越累）</td><td class="num">3.6</td><td class="num">2.4</td></tr>
-</table>
-<p>模拟问卷：SUS 约 74；愿意继续使用 8/12。占位评语是「延期时改的是原来那条」，占位问题是「人在该聊天页里时收不到系统通知」。两句都不是访谈原话。真实记录替换时，请同时替换人数、每一格和引语，并删掉本段的「模拟」框。</p>
-<div class="shot">图 9　待插入：试用前后对比图<br>有真实数据后再画。现在不要用上面的模拟数出图</div>
-<p class="cap">图 9　用户效果。在拿到真实记录前保持空白。</p>
-
-<h3>3. 谁会用，以及用不到的地方</h3>
-<p>直接用户是需要从课程群整理个人时间的学生。替代做法是手工记入系统日历、把聊天粘贴给通用对话助手，或只同步作业平台上的正式任务。时序补的是「群通知」这一段：平台里没有、但助教发在群里的改期和临时班会。它依赖 Android 通知监听，覆盖不了 iOS，也覆盖不了对方没有弹出系统通知的消息。隐藏通知内容、免打扰和厂商对监听服务的限制，都会造成漏采。本文不引用未经核对的市场规模和金额。</p>
-
-<h3>4. 下一步</h3>
-<ol>
-  <li>用真实通知替换 synthetic-v1 中的模板句，并做双人标注后再报告准确率。在此之前，对外只说模板集上的动作 F1。</li>
-  <li>按第五节的方案做 10 人以上的短期试用，替换模拟表。同时记录漏采原因，例如人在聊天页、隐藏内容、通知被折叠。</li>
-  <li>标题幻觉和追问召回是当前完整系统的主要短板。修改规则或提示词之后，必须重新冻结并重跑封闭测试。</li>
-  <li>补测接口失败时是否稳定退回本地规则。本次 400 加 300 次调用的错误数是 0，不能写成已测过降级成功率。</li>
-  <li>评估端侧小模型之前，先有延迟、耗电和准确率。当前版本没有端侧抽取模型。</li>
-  <li>计划导出仍未做。卸载即丢失，这是试用时的实际障碍。</li>
-  <li>网页版只作界面草稿，初赛材料不以网页登录作为体验方式。上线放在初赛之后。</li>
-</ol>
-
-<h2 class="part">（六）附录</h2>
-<h3>1. 冻结记录</h3>
-<table>
-  <tr><th>项</th><th>值</th></tr>
-  <tr><td>Git 提交</td><td>e6cd0b315d11eff0a3e06df4b435257ac9702348</td></tr>
-  <tr><td>产品版本</td><td>Android 0.4.0，versionCode 4</td></tr>
-  <tr><td>实验模型</td><td>deepseek-v4-flash-0731（阿里云百炼，华北 2 北京）</td></tr>
-  <tr><td>产品接口</td><td>https://api.deepseek.com/chat/completions ，默认模型 deepseek-flash</td></tr>
-  <tr><td>温度 / 思考模式</td><td>0.1 / 关闭</td></tr>
-  <tr><td>时区</td><td>Asia/Shanghai</td></tr>
-  <tr><td>数据</td><td>synthetic-v1，开发集 400，封闭测试 100</td></tr>
-  <tr><td>三次动作一致</td><td>99 / 100</td></tr>
-  <tr><td>接口错误</td><td>0</td></tr>
-  <tr><td>冻结日期</td><td>2026-10-12</td></tr>
-</table>
-<p class="note">冻结时的脚本 SHA-256 记在 <code>evaluation/reports/freeze-2026-10-12.txt</code>，预测哈希记在 <code>evaluation/reports/sealed-prediction-hashes.txt</code>。这两份记录、评分程序、原始响应和各组评分 JSON 在仓库 <code>evaluation/</code> 中。封闭测试标准答案不进入仓库。口径以 <code>evaluation/score_predictions.py</code> 为准，交接说明已按该程序改过。</p>
-
-<h3>2. 实现要点</h3>
-<p>正式材料若需摘录代码，建议只保留下面几处，并配一行注释。完整工程随调试包放在网盘，不要把仓库路径写成已发表文献。</p>
-<ul>
-  <li><code>NotificationMatcher.kt</code>：包名白名单、标题去计数后的全等匹配、未开启 AI 时的关键词过滤。</li>
-  <li><code>LocalParser.kt</code>：多个日期要核对；1 到 11 点且未说明上下午要核对；只有日期时截止暂按 23:59；「改到」优先于「取消」。</li>
-  <li><code>DeepSeekClient.kt</code>：动作集合封闭；证据必须是原文子串；目标 ID 按全部本地事项校验，不限于本次候选；完成耗时不按群过滤。</li>
-  <li><code>UncertaintyEngine.kt</code>：用于群通知、手工录入的首次入库，以及 Canvas 同步。引擎新问题最多两条，模型原问题仍留在备注。未填耗时、截断和疑似多事项目前不单独阻断自动执行。</li>
-  <li><code>LocalRepository.kt</code>：重新分析不调用 UncertaintyEngine；去重在模型请求之后。</li>
-  <li><code>LocalScheduler.kt</code>：30 分钟步长、14 天窗口；锁定块和进行中的块不移动；不可拆分任务要连续空档。</li>
-  <li><code>EncryptedStore.kt</code>：Android Keystore 与 AES-GCM；AtomicFile 替换；解密失败不覆盖。</li>
-</ul>
-
-<h3>3. 插图清单</h3>
-<table>
-  <tr><th>图号</th><th>内容</th><th>拍摄时避开</th></tr>
-  <tr><td>图 1</td><td>今天页</td><td>真实群聊、姓名</td></tr>
-  <tr><td>图 2</td><td>主业务流程图，整页</td><td>学校标识、真实群名</td></tr>
-  <tr><td>图 3</td><td>发现页，一条待确认</td><td>真实聊天全文</td></tr>
-  <tr><td>图 4</td><td>延期后的修改确认</td><td>不要拍成新建第二条</td></tr>
-  <tr><td>图 5</td><td>任务页</td><td>真实姓名</td></tr>
-  <tr><td>图 6</td><td>日历，含固定课与时间块</td><td>真实课程全称可打码</td></tr>
-  <tr><td>图 7</td><td>设置：白名单与 DeepSeek 开关</td><td>API Key、Token</td></tr>
-  <tr><td>图 8</td><td>手工录入后的任务变化</td><td>真实聊天</td></tr>
-  <tr><td>图 9</td><td>试用前后对比</td><td>在有真实数据前留空</td></tr>
-</table>
+<h3>3. 测试数据与结果记录</h3>
+<p>原始多表记录包含 60 个用户标识、5,099 项任务、4,135 条耗时标签和 23,053 个候选时间块；这些统计与适配后的有效训练样本量分别计算。仅被选入计划快照且具有已观察反馈的时间块用于执行监督，未知反馈和未选中候选予以排除。</p>
+<p><a href="attachments/data/splits.json">划分记录</a>与<a href="attachments/data/dataset-audit.json">数据审计记录</a>保留原始模拟标记。工程说明提及任务文本与耗时的测量来源，但当前附件未包含完整采集链及执行概率来源，因此按模拟或数据驱动回放解释，不作为真实用户试验。通知结构化另设合成模板评测，开发集 400 条、封闭测试 100 条，适用于受控句式识别。</p>
+<p>表 24 链接 JVM 单元测试的原始 XML 记录，共 5 项用例，失败与错误均为 0，时间戳保留记录原值。该结果验证工程逻辑，与图 10 的历史回放及真机性能评价分别解释。</p>
+<table class="line cols-5 test-results">
+<caption>表 24　JVM 单元测试执行结果</caption><thead><tr><th>测试套件与原始 XML</th><th>用例数</th><th>失败</th><th>错误</th><th>记录时间戳</th></tr></thead><tbody><tr><td><a href="attachments/tests/TEST-com.chronoflow.local.ApiPolicyTest.xml">com.chronoflow.local.ApiPolicyTest</a></td><td>2</td><td>0</td><td>0</td><td>2026-10-18T14:55:58</td></tr><tr><td><a href="attachments/tests/TEST-com.chronoflow.local.CompletionTimingTextTest.xml">com.chronoflow.local.CompletionTimingTextTest</a></td><td>2</td><td>0</td><td>0</td><td>2026-10-18T14:55:58</td></tr><tr><td><a href="attachments/tests/TEST-com.chronoflow.local.DomainTest.xml">com.chronoflow.local.DomainTest</a></td><td>1</td><td>0</td><td>0</td><td>2026-10-18T14:55:58</td></tr></tbody></table>
+<p>设备验收协议见第四部分，覆盖离线生成、课程避让、锁定保留、执行反馈、重启恢复、账号切换和容量不足处理。设备运行记录应包含输入快照、预期与实际结果，以及设备和应用版本；协议与执行记录分别归档。</p>
 
 <h3>4. 参考文献</h3>
-<ul>
-  <li>Android NotificationListenerService. https://developer.android.com/reference/android/service/notification/NotificationListenerService</li>
-  <li>Android Notification 与 MessagingStyle. https://developer.android.com/reference/android/app/Notification</li>
-  <li>DeepSeek Chat Completions API 文档，对应产品路径 <code>api.deepseek.com</code>。评测调用使用阿里云百炼的 OpenAI 兼容接口，模型以响应中的 ID 为准。</li>
-</ul>
-<p class="footer-note">时序 · 课程群日程助手 · 技术方案 · 赛题 2 AI+软件创新。模拟试用表在替换前不得作为正式结果。流程图插入图 2 后，请再导出一次 PDF，并确认文件小于 10 MB。</p>
+<ol class="refs"><li id="ref-1">Rockafellar R T, Uryasev S. Optimization of conditional value-at-risk. <i>Journal of Risk</i>, 2000, 2(3):21–41. <a href="https://doi.org/10.21314/JOR.2000.038">DOI:10.21314/JOR.2000.038</a>。</li><li id="ref-2">ONNX Runtime. Mobile documentation [EB/OL]. <a href="https://onnxruntime.ai/docs/get-started/with-mobile.html">移动端推理文档</a>。访问日期：2026-10-19。</li><li id="ref-3">Chaquopy. Gradle plugin documentation [EB/OL]. <a href="https://chaquo.com/chaquopy/doc/current/android.html">Android / Python 集成文档</a>。访问日期：2026-10-19。</li><li id="ref-4">Reclaim.ai. AI Task Manager App [EB/OL]. <a href="https://reclaim.ai/features/tasks">任务安排功能</a>。访问日期：2026-10-19。</li><li id="ref-5">Motion. AI Task Manager [EB/OL]. <a href="https://www.usemotion.com/features/ai-task-manager">自动任务安排功能</a>。访问日期：2026-10-19。</li><li id="ref-6">TickTick. Features [EB/OL]. <a href="https://www.ticktick.com/features">待办与日历功能</a>。访问日期：2026-10-19。</li><li id="ref-7">中华人民共和国教育部. 2024 年全国教育事业发展统计公报 [EB/OL]. 2025-06-11. <a href="https://hudong.moe.gov.cn/jyb_sjzl/sjzl_fztjgb/202506/t20250611_1193760.html">教育统计公报</a>。访问日期：2026-10-19。</li></ol>
+
+<h3>5. 图件与材料索引</h3>
+<table class="line cols-3 materials-index">
+<caption>表 25　图件及材料索引</caption><thead><tr><th>材料类别</th><th>编号与内容</th><th>证据性质</th></tr></thead><tbody><tr><td>界面截图</td><td>图 1、图 8(a)—(f)</td><td>测试账号所示交互状态</td></tr><tr><td>方法与架构</td><td>图 2—图 7、图 9</td><td>系统结构与机制示意</td></tr><tr><td>历史回放</td><td>图 10 及第四部分八方法结果表</td><td>350 场景、种子 11 的既有汇总</td></tr><tr><td>未来工作台</td><td>图 11</td><td>网页服务化与跨端协同的目标示意</td></tr><tr><td>工程附件</td><td>attachments/design、code、model、data、tests</td><td>设计说明、源文件、元数据、数据审计和原始 JVM 测试记录</td></tr></tbody></table><p>图 10 的绘图数值见<a href="attachments/figures/历史回放主表.csv">历史回放主表 CSV</a>；配图文件校验信息见<a href="attachments/figures/图件校验.json">图件清单</a>。</p>
+<p>本方案以软件实现、模型元信息、工程测试和历史回放作为成果依据，未将专利、第三方检测或用户使用证明列为已有成果。HTML 正文与 <code>figures/</code>、<code>attachments/</code> 共同组成完整技术材料。</p>
+
+<p class="footer-note">时序 · ChronoFlow　技术方案　2026 年 10 月</p>
+
+</main>
 </body>
 </html>
